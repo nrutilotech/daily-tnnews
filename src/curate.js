@@ -124,7 +124,14 @@ function parseEdition(raw, previous = [], headlines = []) {
   const fresh = edition.stories.filter((s) => !isRepeat(s.headline, previous));
   const repeats = edition.stories.filter((s) => isRepeat(s.headline, previous));
   if (repeats.length) console.log(`  set aside ${repeats.length} story(ies) already posted: ${repeats.map((s) => s.headline).join(" | ")}`);
-  edition.stories = [...fresh, ...repeats].slice(0, config.storyCount);
+  // Keep a mix: at most 2 politics and 2 law & order stories; extras move behind the other stories.
+  const LIMIT = { Politics: 2, "Law & Order": 2 };
+  const count = {};
+  const ranked = [...fresh, ...repeats];
+  const within = ranked.filter((s) => (count[s.category] = (count[s.category] ?? 0) + 1) <= (LIMIT[s.category] ?? Infinity));
+  const over = ranked.filter((s) => !within.includes(s));
+  if (over.length) console.log(`  moved ${over.length} extra politics/crime story(ies) down to keep a mix`);
+  edition.stories = [...within, ...over].slice(0, config.storyCount);
   edition.hashtags = [...new Set(edition.hashtags.map((h) => h.replace(/^#/, "").replace(/\s+/g, "")).filter(Boolean))].slice(0, 15);
   // Link each story to the real article it came from (taken from the feed, never written by the AI).
   for (const st of edition.stories) {

@@ -84,6 +84,14 @@ await test("stories already posted are set aside (even reworded)", async () => {
   assert.equal(ed.stories.at(-1).headline, stories[0].headline);
 });
 
+await test("at most 2 politics stories; extras move down to keep a mix", async () => {
+  const stories = editionJson().stories.map((s, i) => ({ ...s, category: i < 5 ? "Politics" : s.category }));
+  handler = () => gem(editionJson({ stories }));
+  const ed = await quiet(() => curate(headlines, []));
+  const top = ed.stories.slice(0, 7).filter((s) => s.category === "Politics").length;
+  assert.equal(top, 2);
+});
+
 await test("photo step: fashion photos never reach the check; rejected stories get no photo", async () => {
   let checkedImages = 0;
   handler = (url, opts) => {
