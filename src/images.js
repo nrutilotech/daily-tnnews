@@ -22,7 +22,7 @@ const CATEGORY_FALLBACK_QUERY = {
 // Each search returns { id, url, credit } or null.
 async function searchPixabay(query, used) {
   const url = `https://pixabay.com/api/?key=${encodeURIComponent(config.pixabayKey)}&q=${encodeURIComponent(query.slice(0, 100))}&image_type=photo&safesearch=true&per_page=20&min_width=1000`;
-  const res = await fetch(url);
+  const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
   if (!res.ok) throw new Error(`Pixabay ${res.status}`);
   const data = await res.json();
   // prefer portrait photos, but take any orientation if that's all there is
@@ -33,7 +33,7 @@ async function searchPixabay(query, used) {
 
 async function searchPexels(query, used) {
   const url = `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&orientation=portrait&per_page=15&locale=en-US`;
-  const res = await fetch(url, { headers: { Authorization: config.pexelsKey } });
+  const res = await fetch(url, { headers: { Authorization: config.pexelsKey }, signal: AbortSignal.timeout(20000) });
   if (!res.ok) throw new Error(`Pexels ${res.status}`);
   const data = await res.json();
   const p = (data.photos ?? []).find((p) => !used.has("px" + p.id));
@@ -52,7 +52,7 @@ export async function findPhotos(stories) {
           const p = await search(q, used);
           if (p) {
             used.add(p.id);
-            const img = await fetch(p.url).then((r) => (r.ok ? r.arrayBuffer() : null));
+            const img = await fetch(p.url, { signal: AbortSignal.timeout(30000) }).then((r) => (r.ok ? r.arrayBuffer() : null));
             if (img) photo = { buffer: Buffer.from(img), credit: p.credit };
             break;
           }

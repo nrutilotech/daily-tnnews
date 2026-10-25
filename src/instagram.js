@@ -5,15 +5,43 @@ import { config } from "./config.js";
 const base = () => `https://${config.igHost}/${config.igApiVersion}`;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function api(method, pathname, params = {}) {
+class IgError extends Error {
+  constructor(message, transient, noAnswer = false) {
+    super(message);
+    this.transient = transient;
+    this.noAnswer = noAnswer; // the request may or may not have gone through
+  }
+}
+
+async function apiOnce(method, pathname, params) {
   const body = new URLSearchParams({ ...params, access_token: config.igToken });
   const url = method === "GET" ? `${base()}/${pathname}?${body}` : `${base()}/${pathname}`;
-  const res = await fetch(url, { method, body: method === "GET" ? undefined : body });
+  const res = await fetch(url, { method, body: method === "GET" ? undefined : body, signal: AbortSignal.timeout(60000) }).catch((e) => {
+    throw new IgError(`Instagram ${pathname}: ${e.name === "TimeoutError" ? "timed out" : e.message}`, true, true);
+  });
   const data = await res.json().catch(() => ({}));
   if (!res.ok || data.error) {
-    throw new Error(`Instagram ${pathname}: ${data.error?.message ?? res.status} ${data.error?.error_user_msg ?? ""}`.trim());
+    const err = data.error ?? {};
+    // is_transient / 5xx / "media not ready yet" (9007) / rate limits (4, 17, 32, 613) are worth retrying
+    const transient = err.is_transient === true || res.status >= 500 || [1, 2, 4, 17, 32, 613].includes(err.code) || err.error_subcode === 2207027 || err.code === 9007;
+    throw new IgError(`Instagram ${pathname}: ${err.message ?? res.status} ${err.error_user_msg ?? ""}`.trim(), transient);
   }
   return data;
+}
+
+// Retries temporary failures with a growing wait; anything else (bad token, bad image) fails at once.
+// With once=true a request that got no answer is never repeated (used for publishing, so a post
+// that went through but timed out on the way back can't be published twice).
+async function api(method, pathname, params = {}, tries = 4, once = false) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await apiOnce(method, pathname, params);
+    } catch (e) {
+      if (!e.transient || attempt >= tries || (once && e.noAnswer)) throw e;
+      console.warn(`  ${e.message.slice(0, 120)} — retrying in ${attempt * 10}s`);
+      await sleep(attempt * 10000);
+    }
+  }
 }
 
 async function waitReady(id, label) {
@@ -36,7 +64,7 @@ export async function publishCarousel(imageUrls, caption) {
     children.push(id);
     console.log(`  uploaded slide ${i + 1}/${imageUrls.length}`);
   }
-  for (const id of children) await waitReady(id, "slide");
+  for (const [i, id] of children.entries()) await waitReady(id, `slide ${i + 1}`);
 
   const { id: carousel } = await api("POST", `${config.igUserId}/media`, {
     media_type: "CAROUSEL",
@@ -44,16 +72,18 @@ export async function publishCarousel(imageUrls, caption) {
     caption,
   });
   await waitReady(carousel, "carousel");
-  const { id: mediaId } = await api("POST", `${config.igUserId}/media_publish`, { creation_id: carousel });
-  const { permalink } = await api("GET", mediaId, { fields: "permalink" }).catch(() => ({}));
+  // publishing straight after FINISHED sometimes answers "media not ready"; api() retries that
+  const { id: mediaId } = await api("POST", `${config.igUserId}/media_publish`, { creation_id: carousel }, 5, true);
+  const { permalink } = await api("GET", mediaId, { fields: "permalink" }, 2).catch(() => ({}));
   return { mediaId, permalink };
 }
 
-// Long-lived Instagram tokens last 60 days; refreshing gives a fresh 60 days.
+// Long-lived Instagram tokens last 60 days; refreshing (allowed once the token is 24 h old) gives a fresh 60 days.
 export async function refreshToken() {
+  if (!config.igToken) throw new Error("IG_ACCESS_TOKEN is not set");
   const url = `https://graph.instagram.com/refresh_access_token?grant_type=ig_refresh_token&access_token=${encodeURIComponent(config.igToken)}`;
-  const res = await fetch(url);
-  const data = await res.json();
-  if (!res.ok || data.error) throw new Error(`Token refresh failed: ${data.error?.message ?? res.status}`);
+  const res = await fetch(url, { signal: AbortSignal.timeout(60000) });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || data.error || !data.access_token) throw new Error(`Token refresh failed: ${data.error?.message ?? res.status}`);
   return data; // { access_token, token_type, expires_in }
 }

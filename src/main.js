@@ -40,8 +40,15 @@ function buildCaption(edition, meta) {
     "",
     edition.hashtags.map((h) => "#" + h).join(" "),
   ];
+  // Instagram's limit is 2,200 characters: drop hashtags first, then cut the end
   let caption = lines.join("\n");
-  if (caption.length > 2200) caption = caption.slice(0, 2190) + "…";
+  const tags = [...edition.hashtags];
+  while (caption.length > 2200 && tags.length) {
+    tags.pop();
+    lines[lines.length - 1] = tags.map((h) => "#" + h).join(" ");
+    caption = lines.join("\n");
+  }
+  if (caption.length > 2200) caption = caption.slice(0, 2199) + "…";
   return caption;
 }
 
@@ -112,17 +119,25 @@ async function post() {
     console.log("DRY_RUN is on — not posting. Would post:\n" + urls.join("\n") + "\n\n" + p.caption);
     return;
   }
-  // make sure the host is serving the images before Instagram tries to fetch them
-  for (let i = 0; i < 12; i++) {
-    const r = await fetch(urls[0], { method: "HEAD" }).catch(() => null);
-    if (r?.ok) break;
-    await new Promise((res) => setTimeout(res, 5000));
+  const history = readHistory();
+  if (history.some((h) => h.id === p.id)) {
+    console.log(`Edition ${p.id} was already posted — skipping so it isn't posted twice.`);
+    return;
+  }
+  // make sure every slide is being served before Instagram tries to fetch them
+  for (const url of urls) {
+    let ok = false;
+    for (let i = 0; i < 12 && !ok; i++) {
+      const r = await fetch(url, { method: "HEAD", signal: AbortSignal.timeout(15000) }).catch(() => null);
+      ok = !!r?.ok;
+      if (!ok) await new Promise((res) => setTimeout(res, 5000));
+    }
+    if (!ok) throw new Error(`Slide not reachable at ${url} — check the media branch`);
   }
   console.log("Publishing to Instagram…");
   const { mediaId, permalink } = await publishCarousel(urls, p.caption);
   console.log(`Posted! ${permalink ?? mediaId}`);
 
-  const history = readHistory();
   history.push({ id: p.id, postedAt: new Date().toISOString(), mediaId, headlines: p.edition.stories.map((s) => s.headline) });
   fs.mkdirSync(path.dirname(config.stateFile), { recursive: true });
   fs.writeFileSync(config.stateFile, JSON.stringify(history.slice(-6), null, 2));
@@ -130,11 +145,13 @@ async function post() {
 
 async function refresh() {
   const t = await refreshToken();
-  // Hide the token from GitHub Actions logs; the workflow saves it as a secret.
-  if (process.env.GITHUB_ACTIONS) console.log(`::add-mask::${t.access_token}`);
-  if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, `token=${t.access_token}\n`);
-  else console.log(t.access_token);
-  console.log(`Token valid for ${Math.round(t.expires_in / 86400)} more days`);
+  // In GitHub Actions the new token goes to a private temp file (never the log or a step output),
+  // and the workflow's next step saves it as the IG_ACCESS_TOKEN secret.
+  if (process.env.RUNNER_TEMP) {
+    console.log(`::add-mask::${t.access_token}`);
+    fs.writeFileSync(path.join(process.env.RUNNER_TEMP, "ig_token"), t.access_token, { mode: 0o600 });
+  } else console.log(t.access_token);
+  console.log(`Token renewed — valid for ${Math.round(t.expires_in / 86400)} more days`);
 }
 
 const cmd = process.argv[2];

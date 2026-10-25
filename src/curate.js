@@ -1,6 +1,6 @@
-// Step 2: Gemini researches the last 12 hours and picks the 10 most important stories.
-// Pass 1 uses Google Search grounding to verify and fill gaps; pass 2 turns the brief into strict JSON.
-// Both run on the Gemini API free tier (search grounding is free on gemini-2.5-flash, up to 500 a day).
+// Step 2: Gemini reads the last 12 hours of headlines and picks the 10 most important stories.
+// One call returns the slides as JSON (checked with zod). If GEMINI_RESEARCH_MODEL is set (a model
+// with Google Search grounding, which isn't free for new users), a research pass runs first.
 import { z } from "zod";
 import { config, CATEGORIES } from "./config.js";
 
@@ -10,14 +10,14 @@ const Story = z.object({
   summary: z.string().describe("2–3 short factual sentences, max ~200 characters, original wording; add detail beyond the headline"),
   key_fact: z.string().describe("One extra figure/date/place NOT already in the headline (e.g. 'Red alert: Madurai, Theni'), max ~40 characters; empty string if nothing new to add"),
   caption_line: z.string().describe("One-line version for the Instagram caption list, max ~90 characters"),
-  source_name: z.string().describe("Publisher the facts come from, e.g. The Hindu"),
+  source_name: z.string().describe("Publisher the facts come from, exactly as shown in the headline list, e.g. The Hindu"),
   source_url: z.string(),
   image_query: z.string().describe("2–4 English words for a stock photo that fits, e.g. 'Chennai heavy rain street'. Never a person's name."),
 });
 
 const Edition = z.object({
   edition_summary: z.string().describe("2–3 sentences: what happened in Tamil Nadu in the last 12 hours"),
-  stories: z.array(Story).describe("Exactly 10 stories, most important first; stories[0] is the cover story"),
+  stories: z.array(Story).describe("Exactly 10 different stories, most important first; stories[0] is the cover story"),
   hashtags: z.array(z.string()).describe("10–15 relevant hashtags without the # sign"),
 });
 
@@ -32,6 +32,7 @@ Editorial rules:
 - Only include events reported in the last ${config.windowHours} hours that relate to Tamil Nadu (state, districts, Chennai, or national decisions that clearly affect TN).
 - Rank by public importance. Aim for a mix: government announcements and policies first, then weather, sports, business/industry, education, health, agriculture, transport and other sectors. Include a weather story if there is any forecast, alert or rain news. Avoid filling the list with politics or crime.
 - Every fact must come from a credible source you saw (the provided headlines or your search results). Never invent numbers, quotes or names. If something is unconfirmed, leave it out.
+- Each story must be a different event. Merge reports of the same event from different outlets into one story.
 - Write summaries in your own words; never copy sentences from articles.
 - Neutral tone, no opinions, no party bias, no sensational language. Do not name victims of crimes or minors.
 - Skip stories already covered in the previous posts listed, unless there is a genuinely new development (then say what is new).
@@ -39,28 +40,30 @@ ${lang}`;
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const TEMPORARY = / (429|500|502|503|504):/;
 
-// Gemini's free tier sometimes answers 503 "high demand" or 429 "rate limit". Wait and retry,
-// then move on to the backup model, so a busy moment doesn't cost a whole edition.
-async function gemini(model, body) {
-  const models = [model, ...config.backupModels.filter((m) => m && m !== model)];
+// The free-tier models are often busy (503) or rate-limited (429). Each model gets a couple of quick
+// tries, then the next model in the list takes over; a timeout or a bad answer moves on at once.
+// `check` turns the raw text into the result and throws if it is unusable.
+async function gemini(body, check, models) {
   let lastError;
-  for (const m of models) {
-    for (let attempt = 1; attempt <= 4; attempt++) {
+  for (const [n, m] of models.entries()) {
+    const attempts = n === models.length - 1 ? 3 : 2;
+    for (let attempt = 1; attempt <= attempts; attempt++) {
       try {
-        const text = await geminiOnce(m, body);
-        if (m !== model) console.log(`  (answered by backup model ${m})`);
-        return text;
+        const result = check(await geminiOnce(m, body));
+        if (n > 0) console.log(`  (answered by backup model ${m})`);
+        return result;
       } catch (e) {
         lastError = e;
-        if (!/ (429|500|502|503|504):|timed out/.test(e.message)) break; // not a temporary error: try the next model
-        if (attempt < 4) {
-          console.warn(`  ${e.message.slice(0, 120)} — retrying in ${attempt * 20}s`);
-          await sleep(attempt * 20000);
+        if (!TEMPORARY.test(e.message) || attempt === attempts) {
+          console.warn(`  ${m}: ${e.message.slice(0, 140)} — trying the next model`);
+          break;
         }
+        console.warn(`  ${m}: busy — retrying in ${attempt * 15}s`);
+        await sleep(attempt * 15000);
       }
     }
-    console.warn(`  giving up on ${m}`);
   }
   throw lastError;
 }
@@ -70,9 +73,9 @@ async function geminiOnce(model, body) {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": config.geminiKey },
     body: JSON.stringify({ systemInstruction: { parts: [{ text: systemPrompt() }] }, ...body }),
-    signal: AbortSignal.timeout(150000),
+    signal: AbortSignal.timeout(120000),
   }).catch((e) => {
-    throw new Error(e.name === "TimeoutError" ? `Gemini ${model} timed out after 150s` : `Gemini ${model}: ${e.message}`);
+    throw new Error(e.name === "TimeoutError" ? `Gemini ${model} timed out after 120s` : `Gemini ${model}: ${e.message}`);
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(`Gemini ${model} ${res.status}: ${data.error?.message ?? "request failed"}`);
@@ -80,6 +83,29 @@ async function geminiOnce(model, body) {
   const text = (cand?.content?.parts ?? []).map((p) => p.text ?? "").join("").trim();
   if (!text) throw new Error(`Gemini ${model} returned no text (${cand?.finishReason ?? data.promptFeedback?.blockReason ?? "unknown"})`);
   return text;
+}
+
+// Parse and validate the slide JSON; small slips (an unknown category, a stray "#") are repaired.
+function parseEdition(raw) {
+  let json;
+  try {
+    json = JSON.parse(raw.replace(/^```(?:json)?\s*|\s*```$/g, ""));
+  } catch {
+    throw new Error("returned invalid JSON");
+  }
+  for (const s of json?.stories ?? []) {
+    if (!CATEGORIES.includes(s.category)) s.category = CATEGORIES.find((c) => c.toLowerCase() === String(s.category).toLowerCase()) ?? "Government";
+  }
+  const parsed = Edition.safeParse(json);
+  if (!parsed.success) throw new Error(`returned JSON in the wrong shape: ${parsed.error.message.slice(0, 200)}`);
+  const edition = parsed.data;
+  // drop exact repeats of the same headline
+  const seen = new Set();
+  edition.stories = edition.stories.filter((s) => !seen.has(s.headline.toLowerCase()) && seen.add(s.headline.toLowerCase()));
+  if (edition.stories.length < 5) throw new Error(`returned only ${edition.stories.length} stories`);
+  edition.stories = edition.stories.slice(0, config.storyCount);
+  edition.hashtags = [...new Set(edition.hashtags.map((h) => h.replace(/^#/, "").replace(/\s+/g, "")).filter(Boolean))].slice(0, 15);
+  return edition;
 }
 
 export async function curate(headlines, history) {
@@ -91,52 +117,44 @@ export async function curate(headlines, history) {
     .join("\n");
   const previous = history.flatMap((p) => p.headlines).slice(-40);
 
-  const task = `It is now ${now} (IST). Prepare the Tamil Nadu news brief for the last ${config.windowHours} hours.
+  const task = `It is now ${now} (IST). Prepare the Tamil Nadu news edition for the last ${config.windowHours} hours.
 
 Headlines collected from news feeds:
 ${list || "(feeds returned nothing)"}
 
 Already posted in previous editions (avoid repeating):
-${previous.map((h) => "- " + h).join("\n") || "(none)"}
+${previous.map((h) => "- " + h).join("\n") || "(none)"}`;
 
-Pick the 10 best stories, most important first. For each give: category, the key facts (who/what/when/where, numbers), the source publisher and URL, and a stock-photo idea.`;
+  const models = [config.writerModel, ...config.backupModels.filter((m) => m && m !== config.writerModel)];
 
-  // Pass 1 — research. Google Search grounding is free only on the older Flash model, so try that first
-  // and fall back to working from the feed headlines alone if it is unavailable or over its limit.
-  let brief;
-  if (!config.researchModel) {
-    console.log(`  Gemini (${config.writerModel}): reading the feed headlines…`);
-    brief = await gemini(config.writerModel, { contents: [{ role: "user", parts: [{ text: task }] }] });
-  } else try {
-    console.log(`  Gemini (${config.researchModel} + Google Search): researching…`);
-    brief = await gemini(config.researchModel, {
-      contents: [{ role: "user", parts: [{ text: task + "\n\nUse Google Search to confirm the important stories and to find anything missing — especially Tamil Nadu government orders/schemes/announcements, the Chennai Regional Meteorological Centre / IMD weather outlook, and sports." }] }],
-      tools: [{ google_search: {} }],
-    });
-  } catch (e) {
-    console.warn(`  search research failed (${e.message}); using feed headlines only`);
-    brief = await gemini(config.writerModel, { contents: [{ role: "user", parts: [{ text: task }] }] });
+  // Optional research pass with Google Search (only when a model for it is configured).
+  let input = task;
+  if (config.researchModel) {
+    try {
+      console.log(`  Gemini (${config.researchModel} + Google Search): researching…`);
+      const brief = await gemini(
+        {
+          contents: [{ role: "user", parts: [{ text: `${task}\n\nUse Google Search to confirm the important stories and to find anything missing — especially Tamil Nadu government orders/schemes/announcements, the Chennai Regional Meteorological Centre / IMD weather outlook, and sports. Then write a brief of the 10 best stories with their key facts and sources.` }] }],
+          tools: [{ google_search: {} }],
+        },
+        (t) => t,
+        [config.researchModel],
+      );
+      input = `${task}\n\nResearch brief (checked with Google Search):\n${brief}`;
+    } catch (e) {
+      console.warn(`  search research failed (${e.message.slice(0, 140)}); using feed headlines only`);
+    }
   }
 
-  // Pass 2 — structure the brief into slides (JSON output, checked with zod).
-  console.log(`  Gemini (${config.writerModel}): writing slides…`);
+  console.log(`  Gemini (${models[0]}): choosing and writing the ${config.storyCount} stories…`);
   const schema = z.toJSONSchema(Edition);
   delete schema.$schema;
-  const request = {
-    contents: [
-      {
-        role: "user",
-        parts: [{ text: `Here is today's research brief:\n\n${brief}\n\nTurn it into exactly ${config.storyCount} slide stories (most important first) following the editorial rules and the field limits.` }],
-      },
-    ],
-    generationConfig: { responseMimeType: "application/json", responseJsonSchema: schema },
-  };
-  const raw = await gemini(config.writerModel, request);
-  const parsed = Edition.safeParse(JSON.parse(raw.replace(/^```(?:json)?\s*|\s*```$/g, "")));
-  if (!parsed.success) throw new Error(`Gemini's slide JSON did not match the expected format: ${parsed.error.message.slice(0, 300)}`);
-  const edition = parsed.data;
-  if (edition.stories.length < 5) throw new Error(`Only ${edition.stories.length} stories came back — not posting a thin edition`);
-  edition.stories = edition.stories.slice(0, config.storyCount);
-  edition.hashtags = [...new Set(edition.hashtags.map((h) => h.replace(/^#/, "").replace(/\s+/g, "")))].slice(0, 15);
-  return edition;
+  return gemini(
+    {
+      contents: [{ role: "user", parts: [{ text: `${input}\n\nPick the ${config.storyCount} best stories, most important first, and write them following the editorial rules and the field limits.` }] }],
+      generationConfig: { responseMimeType: "application/json", responseJsonSchema: schema },
+    },
+    parseEdition,
+    models,
+  );
 }

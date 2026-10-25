@@ -98,5 +98,8 @@ npm run build
 - Read the first week of posts before trusting it fully. Gemini is told to use only facts it found in sources, but AI can still make mistakes. Use `DRY_RUN=true` any time you want to check posts by hand first.
 - Every slide names its source, and the caption says the photos are illustrative.
 - GitHub may start a scheduled run 5–20 minutes late at busy times. This is normal.
+- Gemini's free models are often busy. The bot gives each model a quick retry, then moves on to the backups (`gemini-3.6-flash`, `gemini-3.5-flash-lite`; change them with the `GEMINI_BACKUP_MODELS` variable).
+- The bot never posts the same edition twice. If a run is repeated, it skips the post. If Instagram times out while publishing, it stops rather than risking a double post, so check the page before re-running.
+- If a run fails, GitHub emails you and the next run 12 hours later tries again. The slides are kept on the run page for 7 days, even for failed runs.
 
 Fonts: Noto Sans and Noto Sans Tamil (SIL Open Font License, see `fonts/OFL.txt`).
