@@ -38,7 +38,32 @@ Editorial rules:
 ${lang}`;
 }
 
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Gemini's free tier sometimes answers 503 "high demand" or 429 "rate limit". Wait and retry,
+// then move on to the backup model, so a busy moment doesn't cost a whole edition.
 async function gemini(model, body) {
+  const models = [model, ...config.backupModels.filter((m) => m && m !== model)];
+  let lastError;
+  for (const m of models) {
+    for (let attempt = 1; attempt <= 4; attempt++) {
+      try {
+        return await geminiOnce(m, body);
+      } catch (e) {
+        lastError = e;
+        if (!/ (429|500|502|503|504):/.test(e.message)) break; // not a temporary error: try the next model
+        if (attempt < 4) {
+          console.warn(`  ${e.message.slice(0, 120)} — retrying in ${attempt * 20}s`);
+          await sleep(attempt * 20000);
+        }
+      }
+    }
+    console.warn(`  giving up on ${m}`);
+  }
+  throw lastError;
+}
+
+async function geminiOnce(model, body) {
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": config.geminiKey },
@@ -101,13 +126,7 @@ Pick the 10 best stories, most important first. For each give: category, the key
     ],
     generationConfig: { responseMimeType: "application/json", responseJsonSchema: schema },
   };
-  let raw;
-  try {
-    raw = await gemini(config.writerModel, request);
-  } catch (e) {
-    console.warn(`  ${e.message}; retrying once`);
-    raw = await gemini(config.writerModel, request);
-  }
+  const raw = await gemini(config.writerModel, request);
   const parsed = Edition.safeParse(JSON.parse(raw.replace(/^```(?:json)?\s*|\s*```$/g, "")));
   if (!parsed.success) throw new Error(`Gemini's slide JSON did not match the expected format: ${parsed.error.message.slice(0, 300)}`);
   const edition = parsed.data;

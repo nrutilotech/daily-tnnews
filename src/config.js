@@ -31,6 +31,8 @@ export const config = {
   geminiKey: env("GEMINI_API_KEY"),
   researchModel: env("GEMINI_RESEARCH_MODEL", ""),
   writerModel: env("GEMINI_WRITER_MODEL", "gemini-3.8-flash"),
+  // tried in order when the main model is busy or unavailable (all on the free tier)
+  backupModels: env("GEMINI_BACKUP_MODELS", "gemini-3.6-flash,gemini-3.5-flash-lite").split(",").map((s) => s.trim()),
   pixabayKey: env("PIXABAY_API_KEY"),
   pexelsKey: env("PEXELS_API_KEY"), // optional alternative; Pixabay is used when both are set
 
