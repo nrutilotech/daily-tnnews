@@ -1,0 +1,104 @@
+[
+  {
+    "id": "2026102513",
+    "editionLabel": "Evening Edition",
+    "dateLabel": "25 October 2026",
+    "postedAt": "2026-10-25T13:53:34.344Z",
+    "permalink": "https://www.instagram.com/p/De63B4VkU14/",
+    "summary": "Tamil Nadu mourns the passing of Padma Shri-winning celebrity chef Damu at age 72, while authorities put coastal ports on high alert as a Bay of Bengal storm approaches. Meanwhile, political leaders trade barbs over law and order and state governance issues.",
+    "files": [
+      "01.jpg",
+      "02.jpg",
+      "03.jpg",
+      "04.jpg",
+      "05.jpg",
+      "06.jpg",
+      "07.jpg",
+      "08.jpg",
+      "09.jpg",
+      "10.jpg"
+    ],
+    "stories": [
+      {
+        "category": "Weather",
+        "headline": "Cyclone Warning Signals Raised at Nine Ports in TN and Puducherry",
+        "summary": "As a deep depression over the Bay of Bengal intensifies, distant cautionary signal number one has been hoisted across nine ports in Tamil Nadu and Puducherry. Fishermen have been strongly advised not to venture into rough seas.",
+        "key_fact": "Signal No. 1 hoisted at 9 ports",
+        "source_name": "DT Next",
+        "source_url": "https://www.dtnext.in/news/tamilnadu/cyclone-warning-no-1-signal-hoisted-at-9-ports-in-tamil-nadu-and-puducherry"
+      },
+      {
+        "category": "Politics",
+        "headline": "Stalin Slams Ruling TVK Regime Over Crime and Drug Concerns",
+        "summary": "DMK president M.K. Stalin launched a sharp critique against the state government, alleging a worsening climate where sex crimes and narcotics are on a steep rise. He called on party cadres to prepare for a political shift.",
+        "key_fact": "Stalin speaks in Chennai",
+        "source_name": "India Today",
+        "source_url": "https://www.indiatoday.in/india/south/story/mk-stalin-slams-vijay-government-over-sexual-crimes-drug-spread-power-cuts-rising-prices-tamil-nadu-3024756-2026-10-25"
+      },
+      {
+        "category": "Politics",
+        "headline": "EPS Slams Government Over Law and Order and Anti-Socials",
+        "summary": "AIADMK leader Edappadi K. Palaniswami criticized the administration over a perceived surge in crime and public safety issues. He urged officials to take stringent steps against growing lawlessness across districts.",
+        "key_fact": "EPS targets state administration",
+        "source_name": "The New Indian Express",
+        "source_url": "https://www.newindianexpress.com/states/tamil-nadu/2026/Oct/25/surge-in-crimes-raises-questions-on-law-order-in-tamil-nadu-says-eps"
+      },
+      {
+        "category": "Politics",
+        "headline": "CPI Launches Signature Campaign Against New Secretariat Project",
+        "summary": "The Communist Party of India initiated a signature campaign opposing the construction of the new Secretariat building at Pattinapakkam. Local fishermen and opposition groups have voiced strong concerns over the proposed site.",
+        "key_fact": "Pattinapakkam site opposed",
+        "source_name": "The Hindu – Tamil Nadu",
+        "source_url": "https://www.thehindu.com/news/national/tamil-nadu/cpi-launches-signature-campaign-against-tamil-nadus-new-secretariat-project-at-pattinapakkam/article71622978.ece"
+      },
+      {
+        "category": "Politics",
+        "headline": "TTV Dhinakaran Warns Rising Commodity Prices Threaten Regime",
+        "summary": "AMMK leader TTV Dhinakaran warned that escalating food prices and ration distribution issues could severely hurt the ruling government. He criticized authorities for failing to control the rising cost of essential grains.",
+        "key_fact": "Dhinakaran warns of public backlash",
+        "source_name": "Deccan Chronicle",
+        "source_url": "https://www.deccanchronicle.com/amp/southern-states/tamil-nadu/ttv-dhinakaran-warns-rising-rice-prices-could-threaten-tvk-govt-1998647"
+      },
+      {
+        "category": "Transport",
+        "headline": "MRTS Station Gaps Highlighted Following Fatal Accident",
+        "summary": "A recent fatal mishap at the Thirumayilai MRTS station has drawn public attention to severe maintenance gaps and safety hazards. Commuters have urged immediate infrastructure fixes as the railway board plans service handovers.",
+        "key_fact": "Thirumayilai station incident",
+        "source_name": "The Hindu – Chennai",
+        "source_url": "https://www.thehindu.com/news/cities/chennai/safety-at-the-mrts-railway-stations-in-chennai/article71620990.ece"
+      },
+      {
+        "category": "Education",
+        "headline": "University of Madras Plans Portal Upgrade After Cyberattacks",
+        "summary": "Following four separate cyberattacks within a span of six months, the University of Madras has initiated comprehensive security upgrades for its official web portal to protect student records and institutional data.",
+        "key_fact": "Four attacks in six months",
+        "source_name": "Times of India – Chennai",
+        "source_url": "https://timesofindia.indiatimes.com/city/chennai/university-of-madras-plans-portal-upgrade-after-four-cyberattacks-in-six-months/articleshow/135191332.cms"
+      },
+      {
+        "category": "Business",
+        "headline": "Onion Prices Touch Rs 60 Per Kg at Koyambedu Wholesale Market",
+        "summary": "Wholesale onion prices in Chennai's Koyambedu market have climbed to Rs 60 per kg due to supply fluctuations. Retail buyers in the city are feeling the pinch as festive season demand begins to pick up pace.",
+        "key_fact": "Rs 60 per kg at Koyambedu",
+        "source_name": "DT Next",
+        "source_url": "https://www.dtnext.in/news/chennai/onion-prices-rise-again-at-chennais-koyambedu-market-touch-rs-60-per-kg"
+      },
+      {
+        "category": "Business",
+        "headline": "SEBI Bars SecureKloud Promoters From Selling Assets Over Dues",
+        "summary": "Markets regulator SEBI has restricted the promoters of SecureKloud Technologies from transferring or selling their assets. The action comes in connection with pending financial dues amounting to over Rs 6.45 crore.",
+        "key_fact": "Dues stand at Rs 6.45 crore",
+        "source_name": "The420.in",
+        "source_url": "https://the420.in/sebi-restricts-securekloud-promoters-property-transfers/"
+      },
+      {
+        "category": "Environment",
+        "headline": "Chennai Reservoirs Record Water Boost After Days of Rainfall",
+        "summary": "Recent consistent downpours over the past nine days have significantly improved storage levels across key reservoirs supplying drinking water to Chennai, adding notable weeks of security to city reserves.",
+        "key_fact": "Storage boosted by 28 days",
+        "source_name": "DT Next",
+        "source_url": "https://www.dtnext.in/news/chennai/nine-days-of-rain-add-28-days-of-drinking-water-to-chennais-reserves"
+      }
+    ]
+  }
+]
