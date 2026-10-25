@@ -45,12 +45,9 @@ function buildCaption(edition, meta) {
     `🕛 Tamil Nadu in the last ${config.windowHours} hours:`,
     edition.edition_summary,
     "",
-    // each headline with its link on the line below (short link if we have one, else the article's address)
-    ...edition.stories.flatMap((s, i) => {
-      // no short link: point to the story on the news page rather than a very long article address
-      const link = (s.short_url || `${config.pageUrl}#${meta.id}-${i + 1}`).replace(/^https?:\/\/(www\.)?/, "");
-      return [`${NUM[i]} ${s.caption_line}`, ...(link ? [`🔗 ${link}`] : []), ""];
-    }),
+    // one line per story; no links here (each slide shows its story's link, and the bio links to the news page)
+    ...edition.stories.map((s, i) => `${NUM[i]} ${s.caption_line}`),
+    "",
     `👉 Swipe through all ${edition.stories.length} slides for the details.`,
     `🔗 Full stories with links to the original reports: link in bio.`,
     `🔔 Follow ${config.handle} for Tamil Nadu news every morning & evening.`,
