@@ -56,8 +56,8 @@ const Brief = z.object({
   briefs: z.array(
     z.object({
       story: z.number().int().describe("Story number as given"),
-      subject: z.string().describe("One sentence: what a fitting illustrative photo shows (a place, object or scene from the article)"),
-      queries: z.array(z.string()).describe("2–3 stock-photo searches, 1–3 English words each, places/objects only, most specific first"),
+      subject: z.string().describe("A GENERIC scene a stock photo library would have that illustrates the article's theme, e.g. 'stormy sea and dark clouds' for a cyclone warning, 'sacks of onions at a market' for onion prices, 'university building' for a university story. Not the exact place or event."),
+      queries: z.array(z.string()).describe("2–3 stock-photo searches, 1–3 generic English words each (objects, places, weather, nature), most fitting first, e.g. 'stormy sea', 'onions market', 'check dam water'"),
       people_ok: z.boolean().describe("true only if the article is about people visibly doing something (sport, farming, a crowd); never for portraits"),
       summary: z.string().describe("The slide summary, corrected if the article says otherwise; same length limits; else repeat it unchanged"),
       key_fact: z.string().describe("The key fact, corrected from the article if needed; empty string if none"),
@@ -103,7 +103,7 @@ ${s.article_text || "(the article could not be read — use the headline and sum
       systemInstruction: {
         parts: [
           {
-            text: "You are the photo editor and fact-checker of a Tamil Nadu news page. Read each full article carefully before deciding anything. Photos are illustrative stock photos, so describe places, buildings, objects or scenes that fit the article — never a specific named person, never portraits, and never anything that could mislead readers about what happened.",
+            text: "You are the photo editor and fact-checker of a Tamil Nadu news page. Read each full article carefully before deciding anything. Photos are illustrative stock photos, so describe a generic place, object or scene that illustrates the article's theme — the kind of photo any stock library has. Never a specific named person, never portraits, never a specific foreign landmark, and never anything that could mislead readers about what happened.",
           },
         ],
       },
@@ -125,7 +125,7 @@ async function candidates(story, brief, used) {
   ];
   const found = [];
   for (const [q, cat] of searches) {
-    if (found.length >= 3) break;
+    if (found.length >= 4) break;
     const words = keywords(q);
     if (!words.length) continue;
     const url = `https://pixabay.com/api/?key=${encodeURIComponent(config.pixabayKey)}&q=${encodeURIComponent(words.join(" ").slice(0, 100))}&image_type=photo&safesearch=true&per_page=20&min_width=1000${cat ? `&category=${cat}` : ""}`;
@@ -133,7 +133,7 @@ async function candidates(story, brief, used) {
       const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
       if (!res.ok) throw new Error(`Pixabay ${res.status}`);
       for (const h of (await res.json()).hits ?? []) {
-        if (found.length >= 3) break;
+        if (found.length >= 4) break;
         const tags = h.tags ?? "";
         if (h.type !== "photo" || used.has(h.id) || found.some((f) => f.id === h.id)) continue;
         if (ALWAYS_BLOCKED.test(tags) || (!brief?.people_ok && PEOPLE.test(tags))) continue;
@@ -156,7 +156,7 @@ async function download(url, ms = 30000) {
 async function pickPhotos(stories, briefs, cands) {
   const parts = [
     {
-      text: `You are checking stock photos for news slides. For each story, look at its candidate photos and choose the one that clearly fits the article brief. Choose 0 if none fits. Reject any photo that shows something unrelated, shows people when the brief does not allow people, is sexual or fashion-like, shows a recognisable foreign landmark or flag that would mislead, or could be mistaken for a real photo of a different event.`,
+      text: `You are choosing illustrative stock photos for news slides. These are NOT photos of the actual event and do not need to show the exact place: a photo fits if it is a reasonable, honest illustration of the story's theme (any stormy sea for a cyclone warning, any onions for onion prices, a generic campus for a university story). For each story pick the best fitting photo, or 0 only if none is a reasonable illustration. Reject a photo (never pick it) if it: is unrelated to the theme; shows people when people are not allowed; is sexual, glamour or fashion-like; shows a recognisable foreign landmark, flag, signage or text that would mislead; or looks like a real photo of a specific different event (an accident, a protest, a ceremony).`,
     },
   ];
   for (const [i, s] of stories.entries()) {
