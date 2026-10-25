@@ -10,6 +10,7 @@ import { config } from "./config.js";
 import { collectHeadlines } from "./collect.js";
 import { curate } from "./curate.js";
 import { findPhotos } from "./images.js";
+import { readArticles } from "./article.js";
 import { renderSlides, renderStory } from "./render.js";
 import { publishCarousel, publishStory, refreshToken } from "./instagram.js";
 import { SAMPLE_EDITION } from "./sample.js";
@@ -90,15 +91,26 @@ function writeOutput(edition, slides, meta, extra = {}, story = null) {
 async function build() {
   const meta = editionMeta();
   console.log(`Building ${meta.editionLabel}, ${meta.dateLabel}`);
-  console.log("1/4 Collecting headlines…");
+  console.log("1/5 Collecting headlines…");
   const headlines = await collectHeadlines();
   console.log(`  ${headlines.length} candidate headlines`);
-  console.log("2/4 Choosing the top stories with Gemini…");
+  console.log("2/5 Choosing the top stories with Gemini…");
   const edition = await curate(headlines, readHistory());
   edition.stories.forEach((s, i) => console.log(`  ${i + 1}. [${s.category}] ${s.headline}`));
-  console.log("3/4 Finding photos…");
+  console.log("3/5 Reading the full articles…");
+  const articles = await readArticles(edition.stories.map((s) => s.source_url));
+  articles.forEach((a, i) => {
+    const s = edition.stories[i];
+    s.article_text = a.text;
+    // link straight to the publisher's article instead of the Google News redirect
+    if (a.url && /^https?:\/\//.test(a.url) && !/news\.google\.com/.test(a.url)) s.source_url = a.url;
+  });
+  console.log(`  read ${articles.filter((a) => a.text.length >= 300).length} of ${articles.length} full articles`);
+  console.log("4/5 Choosing photos that fit each article…");
   const photos = await findPhotos(edition.stories);
-  console.log("4/4 Drawing slides…");
+  // the article text is only used here; it is the publisher's text, so it isn't kept or published
+  edition.stories.forEach((s) => delete s.article_text);
+  console.log("5/5 Drawing slides…");
   const slides = await renderSlides(edition, photos, meta);
   const story = await renderStory(edition, photos, meta);
   const files = writeOutput(edition, slides, meta, {}, story);

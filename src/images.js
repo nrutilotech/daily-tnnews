@@ -1,8 +1,13 @@
-// Step 3: find a free-to-use photo for each story from Pixabay (or Pexels, if that key is set).
-// Both licences allow commercial use. News-site photos are copyrighted, so they are never reposted.
-// News slides should show places and things, not random people, so searches are kept inside a
-// matching Pixabay category, people/fashion photos are rejected, and the photo's tags must match.
+// Step 3: choose a photo for each story only after reading the full article, and only if it fits.
+//   1. Gemini reads each full article and describes what a fitting photo should show (+ search terms).
+//      In the same pass it checks the slide text against the article and corrects it if needed.
+//   2. Pixabay (free licence; news-site photos are copyrighted and never reposted) returns candidates,
+//      searched inside a matching category, with people/fashion photos filtered out by their tags.
+//   3. Gemini looks at the candidate photos next to the article brief and picks one only if it really
+//      matches. If none does — or the check can't run — the slide uses the designed background.
+import { z } from "zod";
 import { config } from "./config.js";
+import { askGemini } from "./curate.js";
 
 const CATEGORY_FALLBACK_QUERY = {
   Government: "government office building",
@@ -39,73 +44,200 @@ const PIXABAY_CATEGORY = {
   Politics: "buildings",
 };
 
-// Photos tagged with any of these are never used on a news slide.
-const BLOCKED_TAGS = /\b(woman|women|girl|girls|man|men|boy|model|models|fashion|beauty|beautiful|sexy|lingerie|bikini|swimsuit|portrait|female|male|lady|makeup|glamour|pose|posing|body|people|person|couple|love|selfie|face|child|kid|baby|wedding|bride|nude)\b/i;
-const STOP = new Set(["and", "the", "for", "with", "new", "tamil", "nadu", "chennai", "india", "indian", "public", "model", "state"]);
-const keywords = (q) => q.toLowerCase().split(/[^a-z]+/).filter((w) => w.length > 2 && !STOP.has(w));
+// Never on a news slide.
+const ALWAYS_BLOCKED = /\b(model|models|fashion|beauty|beautiful|sexy|lingerie|bikini|swimsuit|glamour|makeup|pose|posing|nude|selfie|wedding|bride|romance|romantic|couple|love|kiss)\b/i;
+// People shots are only allowed when the article is genuinely about people doing something visible
+// (a match, farmers in a field, a crowd) — Gemini decides that in the brief.
+const PEOPLE = /\b(woman|women|girl|girls|man|men|boy|boys|lady|female|male|portrait|face|person|people|child|children|kid|kids|baby)\b/i;
+const STOP = new Set(["and", "the", "for", "with", "new", "tamil", "nadu", "chennai", "india", "indian", "public", "model", "state", "hub", "hubs", "star"]);
+const keywords = (q) => String(q).toLowerCase().split(/[^a-z]+/).filter((w) => w.length > 2 && !STOP.has(w));
 
-function acceptable(tags, query, needMatch) {
-  if (BLOCKED_TAGS.test(tags)) return false;
-  if (!needMatch) return true;
-  const t = tags.toLowerCase();
-  return keywords(query).some((w) => t.includes(w.replace(/s$/, "")));
+const Brief = z.object({
+  briefs: z.array(
+    z.object({
+      story: z.number().int().describe("Story number as given"),
+      subject: z.string().describe("One sentence: what a fitting illustrative photo shows (a place, object or scene from the article)"),
+      queries: z.array(z.string()).describe("2–3 stock-photo searches, 1–3 English words each, places/objects only, most specific first"),
+      people_ok: z.boolean().describe("true only if the article is about people visibly doing something (sport, farming, a crowd); never for portraits"),
+      summary: z.string().describe("The slide summary, corrected if the article says otherwise; same length limits; else repeat it unchanged"),
+      key_fact: z.string().describe("The key fact, corrected from the article if needed; empty string if none"),
+    }),
+  ),
+});
+
+const Pick = z.object({
+  picks: z.array(
+    z.object({
+      story: z.number().int(),
+      photo: z.number().int().describe("Number of the photo that fits, or 0 if none fits"),
+      reason: z.string().describe("Short reason"),
+    }),
+  ),
+});
+
+const schemaOf = (zod) => {
+  const s = z.toJSONSchema(zod);
+  delete s.$schema;
+  return s;
+};
+const json = (zod) => (raw) => {
+  const parsed = zod.safeParse(JSON.parse(raw.replace(/^```(?:json)?\s*|\s*```$/g, "")));
+  if (!parsed.success) throw new Error(`returned JSON in the wrong shape: ${parsed.error.message.slice(0, 160)}`);
+  return parsed.data;
+};
+
+// 1. Read the articles; brief each photo; correct slide text that the article contradicts.
+async function writeBriefs(stories) {
+  const list = stories
+    .map(
+      (s, i) => `### Story ${i + 1} [${s.category}]
+Headline: ${s.headline}
+Slide summary: ${s.summary}
+Key fact: ${s.key_fact || "(none)"}
+Full article (${s.source_name}):
+${s.article_text || "(the article could not be read — use the headline and summary only)"}`,
+    )
+    .join("\n\n");
+  const result = await askGemini(
+    {
+      systemInstruction: {
+        parts: [
+          {
+            text: "You are the photo editor and fact-checker of a Tamil Nadu news page. Read each full article carefully before deciding anything. Photos are illustrative stock photos, so describe places, buildings, objects or scenes that fit the article — never a specific named person, never portraits, and never anything that could mislead readers about what happened.",
+          },
+        ],
+      },
+      contents: [{ role: "user", parts: [{ text: `For each story below, read the full article, then:\n- describe what a fitting illustrative photo shows and give 2–3 short search terms;\n- check the slide summary and key fact against the article. If the article contradicts them or they add facts not in it, rewrite them from the article (summary max ~200 characters, key fact max ~40). Otherwise repeat them unchanged.\n\n${list}` }] }],
+      generationConfig: { responseMimeType: "application/json", responseJsonSchema: schemaOf(Brief) },
+    },
+    json(Brief),
+  );
+  return stories.map((_, i) => result.briefs.find((b) => b.story === i + 1) ?? null);
 }
 
-// Each search returns { id, url, credit } or null.
-async function searchPixabay(query, used, { category, needMatch }) {
-  const q = keywords(query).join(" ").slice(0, 100) || query;
-  const url = `https://pixabay.com/api/?key=${encodeURIComponent(config.pixabayKey)}&q=${encodeURIComponent(q)}&image_type=photo&safesearch=true&per_page=30&min_width=1000${category ? `&category=${category}` : ""}`;
-  const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
-  if (!res.ok) throw new Error(`Pixabay ${res.status}`);
-  const data = await res.json();
-  const hits = (data.hits ?? []).filter((h) => h.type === "photo" && !used.has("pb" + h.id) && acceptable(h.tags ?? "", query, needMatch));
-  // prefer portrait photos, but take any orientation if that's all there is
-  const p = hits.find((h) => h.imageHeight >= h.imageWidth) ?? hits[0];
-  return p && { id: "pb" + p.id, url: p.largeImageURL, credit: `Photo: ${p.user} / Pixabay` };
+// 2. Candidate photos for one story.
+async function candidates(story, brief, used) {
+  const category = PIXABAY_CATEGORY[story.category];
+  const searches = [
+    ...(brief?.queries ?? []).map((q) => [q, category]),
+    ...(brief?.queries ?? []).slice(0, 1).map((q) => [q, null]),
+    [CATEGORY_FALLBACK_QUERY[story.category], category],
+  ];
+  const found = [];
+  for (const [q, cat] of searches) {
+    if (found.length >= 3) break;
+    const words = keywords(q);
+    if (!words.length) continue;
+    const url = `https://pixabay.com/api/?key=${encodeURIComponent(config.pixabayKey)}&q=${encodeURIComponent(words.join(" ").slice(0, 100))}&image_type=photo&safesearch=true&per_page=20&min_width=1000${cat ? `&category=${cat}` : ""}`;
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(20000) });
+      if (!res.ok) throw new Error(`Pixabay ${res.status}`);
+      for (const h of (await res.json()).hits ?? []) {
+        if (found.length >= 3) break;
+        const tags = h.tags ?? "";
+        if (h.type !== "photo" || used.has(h.id) || found.some((f) => f.id === h.id)) continue;
+        if (ALWAYS_BLOCKED.test(tags) || (!brief?.people_ok && PEOPLE.test(tags))) continue;
+        found.push({ id: h.id, preview: h.webformatURL, full: h.largeImageURL, tags, credit: `Photo: ${h.user} / Pixabay`, portrait: h.imageHeight >= h.imageWidth });
+      }
+    } catch (e) {
+      console.warn(`  photo search "${q}" failed: ${e.message}`);
+    }
+  }
+  return found;
 }
 
-async function searchPexels(query, used) {
-  const url = `https://api.pexels.com/v1/search?query=${encodeURIComponent(keywords(query).join(" ") || query)}&orientation=portrait&per_page=15&locale=en-US`;
-  const res = await fetch(url, { headers: { Authorization: config.pexelsKey }, signal: AbortSignal.timeout(20000) });
-  if (!res.ok) throw new Error(`Pexels ${res.status}`);
-  const data = await res.json();
-  const p = (data.photos ?? []).find((p) => !used.has("px" + p.id) && !BLOCKED_TAGS.test(p.alt ?? ""));
-  return p && { id: "px" + p.id, url: p.src.large2x, credit: `Photo: ${p.photographer} / Pexels` };
+async function download(url, ms = 30000) {
+  const res = await fetch(url, { signal: AbortSignal.timeout(ms) });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  return Buffer.from(await res.arrayBuffer());
+}
+
+// 3. Gemini looks at every candidate and picks the one that fits each article (or none).
+async function pickPhotos(stories, briefs, cands) {
+  const parts = [
+    {
+      text: `You are checking stock photos for news slides. For each story, look at its candidate photos and choose the one that clearly fits the article brief. Choose 0 if none fits. Reject any photo that shows something unrelated, shows people when the brief does not allow people, is sexual or fashion-like, shows a recognisable foreign landmark or flag that would mislead, or could be mistaken for a real photo of a different event.`,
+    },
+  ];
+  for (const [i, s] of stories.entries()) {
+    if (!cands[i].length) continue;
+    parts.push({ text: `\n### Story ${i + 1}: ${s.headline}\nPhoto should show: ${briefs[i]?.subject ?? s.headline}\nPeople allowed: ${briefs[i]?.people_ok ? "yes" : "no"}` });
+    for (const [k, c] of cands[i].entries()) {
+      parts.push({ text: `Story ${i + 1}, photo ${k + 1}:` });
+      parts.push({ inline_data: { mime_type: "image/jpeg", data: c.data.toString("base64") } });
+    }
+  }
+  const result = await askGemini(
+    {
+      systemInstruction: { parts: [{ text: "You are a careful photo editor for a news page. Accuracy matters more than having a photo." }] },
+      contents: [{ role: "user", parts }],
+      generationConfig: { responseMimeType: "application/json", responseJsonSchema: schemaOf(Pick) },
+    },
+    json(Pick),
+  );
+  return stories.map((_, i) => result.picks.find((p) => p.story === i + 1) ?? { photo: 0, reason: "not answered" });
 }
 
 export async function findPhotos(stories) {
+  if (!config.pixabayKey) return stories.map(() => null);
+
+  let briefs;
+  try {
+    console.log("  reading the full articles to brief the photos…");
+    briefs = await writeBriefs(stories);
+    // apply corrections from the article check
+    for (const [i, b] of briefs.entries()) {
+      const s = stories[i];
+      if (!b || !s.article_text) continue;
+      if (b.summary && b.summary.trim() !== s.summary.trim()) {
+        console.log(`  story ${i + 1}: summary corrected from the full article`);
+        s.summary = b.summary.trim();
+      }
+      if (typeof b.key_fact === "string" && b.key_fact.trim() !== (s.key_fact ?? "").trim()) s.key_fact = b.key_fact.trim();
+    }
+  } catch (e) {
+    console.warn(`  could not brief the photos (${e.message.slice(0, 120)}) — using designed backgrounds`);
+    return stories.map(() => null);
+  }
+
   const used = new Set();
-  const out = [];
-  for (const s of stories) {
-    const category = PIXABAY_CATEGORY[s.category];
-    const fallback = CATEGORY_FALLBACK_QUERY[s.category];
-    // most specific first; the generic category photo is the last resort
-    const attempts = config.pixabayKey
-      ? [
-          [s.image_query, { category, needMatch: true }],
-          [s.image_query, { category: null, needMatch: true }],
-          [fallback, { category, needMatch: false }],
-        ]
-      : config.pexelsKey
-        ? [[s.image_query], [fallback]]
-        : [];
-    let photo = null;
-    for (const [q, opts] of attempts) {
-      if (!q) continue;
+  const cands = [];
+  for (const [i, s] of stories.entries()) {
+    const list = await candidates(s, briefs[i], used);
+    for (const c of list) {
       try {
-        const p = config.pixabayKey ? await searchPixabay(q, used, opts) : await searchPexels(q, used);
-        if (!p) continue;
-        const img = await fetch(p.url, { signal: AbortSignal.timeout(30000) }).then((r) => (r.ok ? r.arrayBuffer() : null));
-        if (img) {
-          used.add(p.id);
-          photo = { buffer: Buffer.from(img), credit: p.credit };
-          break;
-        }
-      } catch (e) {
-        console.warn(`  photo search "${q}" failed: ${e.message}`);
+        c.data = await download(c.preview, 20000);
+      } catch {
+        c.data = null;
       }
     }
-    out.push(photo); // null → the slide uses a designed colour background instead
+    cands.push(list.filter((c) => c.data));
+    list.forEach((c) => used.add(c.id));
   }
-  return out;
+
+  let picks;
+  try {
+    console.log("  checking candidate photos against each article…");
+    picks = await pickPhotos(stories, briefs, cands);
+  } catch (e) {
+    console.warn(`  photo check failed (${e.message.slice(0, 120)}) — using designed backgrounds`);
+    return stories.map(() => null);
+  }
+
+  const photos = [];
+  for (const [i, pick] of picks.entries()) {
+    const c = cands[i][pick.photo - 1];
+    if (!c) {
+      console.log(`  story ${i + 1}: no photo fits (${pick.reason}) — designed background`);
+      photos.push(null);
+      continue;
+    }
+    try {
+      photos.push({ buffer: await download(c.full), credit: c.credit });
+      console.log(`  story ${i + 1}: photo ${pick.photo} — ${pick.reason}`);
+    } catch {
+      photos.push(null);
+    }
+  }
+  return photos;
 }

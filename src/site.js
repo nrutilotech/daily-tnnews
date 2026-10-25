@@ -9,6 +9,8 @@ export const EDITIONS_FILE = path.join(ROOT, "state", "editions.json");
 const SITE_DIR = path.join(ROOT, "site");
 const KEEP = 14; // one week of morning + evening editions
 
+// only ordinary web links are ever put on the page
+const safeUrl = (u) => (/^https?:\/\//i.test(String(u ?? "")) ? u : "#");
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
 export function readEditions() {
@@ -34,7 +36,7 @@ function storyCard(s, i, editionId) {
   <h3>${esc(s.headline)}</h3>
   ${s.key_fact ? `<p class="fact" style="border-color:${color}">${esc(s.key_fact)}</p>` : ""}
   <p>${esc(s.summary)}</p>
-  <a class="read" href="${esc(s.source_url)}" target="_blank" rel="noopener">Read the full story${s.source_name ? ` on ${esc(s.source_name)}` : ""} <span aria-hidden="true">↗</span></a>
+  <a class="read" href="${esc(safeUrl(s.source_url))}" target="_blank" rel="noopener">Read the full story${s.source_name ? ` on ${esc(s.source_name)}` : ""} <span aria-hidden="true">↗</span></a>
 </article>`;
 }
 
@@ -48,7 +50,7 @@ export function buildSite(mediaBaseUrl = config.mediaBaseUrl) {
   <p class="label">${esc(latest.editionLabel)} · ${esc(latest.dateLabel)}</p>
   <h2>Tamil Nadu in the last ${config.windowHours} hours</h2>
   <p class="summary">${esc(latest.summary)}</p>
-  ${latest.permalink ? `<a class="ig" href="${esc(latest.permalink)}" target="_blank" rel="noopener">View this edition on Instagram</a>` : ""}
+  ${latest.permalink ? `<a class="ig" href="${esc(safeUrl(latest.permalink))}" target="_blank" rel="noopener">View this edition on Instagram</a>` : ""}
   ${
     mediaBaseUrl && latest.files?.length
       ? `<div class="slides" aria-label="Slides from this edition">${latest.files
@@ -64,7 +66,7 @@ export function buildSite(mediaBaseUrl = config.mediaBaseUrl) {
     ? `<section class="older"><h2>Earlier editions</h2>${older
         .map(
           (e) => `<details id="${esc(e.id)}"><summary><span>${esc(e.editionLabel)}</span> · ${esc(e.dateLabel)}</summary>
-  <ol>${e.stories.map((s) => `<li><a href="${esc(s.source_url)}" target="_blank" rel="noopener">${esc(s.headline)}</a> <small>${esc(s.source_name)}</small></li>`).join("")}</ol>
+  <ol>${e.stories.map((s) => `<li><a href="${esc(safeUrl(s.source_url))}" target="_blank" rel="noopener">${esc(s.headline)}</a> <small>${esc(s.source_name)}</small></li>`).join("")}</ol>
 </details>`,
         )
         .join("\n")}</section>`

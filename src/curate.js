@@ -68,6 +68,11 @@ async function gemini(body, check, models) {
   throw lastError;
 }
 
+// The same retry/backup behaviour for other steps (photo briefs, the photo check).
+export function askGemini(body, check) {
+  return gemini(body, check, [config.writerModel, ...config.backupModels.filter((m) => m && m !== config.writerModel)]);
+}
+
 async function geminiOnce(model, body) {
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method: "POST",
