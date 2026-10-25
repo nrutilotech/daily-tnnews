@@ -225,18 +225,21 @@ function looksLikeGraphic(img) {
 }
 
 // The photo from the news report itself, credited to the publisher (step 4).
+// Returns { photo } or { why } (the reason there is none, for the log).
 async function sourcePhoto(story) {
-  if (!config.sourcePhotos || !story.source_image || NO_SOURCE_PHOTO.has(story.category)) return null;
+  if (!config.sourcePhotos) return { why: "news photos are turned off" };
+  if (NO_SOURCE_PHOTO.has(story.category)) return { why: "crime story, so the report's photo isn't used" };
+  if (!story.source_image) return { why: "the report has no photo, or it couldn't be read" };
   try {
     const buffer = await download(story.source_image, 20000, { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130 Safari/537.36" });
     const img = await loadImage(buffer);
     // too small to fill a slide, a banner/strip rather than a photo, or a logo card
-    if (img.width < 600 || img.height < 320 || img.width / img.height > 2.4 || img.height / img.width > 1.8) return null;
-    if (looksLikeGraphic(img)) return null;
+    if (img.width < 600 || img.height < 320 || img.width / img.height > 2.4 || img.height / img.width > 1.8) return { why: `the report's photo is too small or an odd shape (${img.width}×${img.height})` };
+    if (looksLikeGraphic(img)) return { why: "the report's image is a logo or graphic" };
     const publisher = String(story.source_name ?? "").replace(/\s+[–-]\s+.*$/, "").trim() || new URL(story.source_url).hostname.replace(/^www\./, "");
-    return { buffer, credit: `Photo: ${publisher}` };
-  } catch {
-    return null;
+    return { photo: { buffer, credit: `Photo: ${publisher}` } };
+  } catch (e) {
+    return { why: `the report's photo couldn't be loaded (${e.message.slice(0, 60)})` };
   }
 }
 
@@ -247,8 +250,9 @@ export async function findPhotos(stories) {
   const isDefault = (u) => seen.filter((x) => x === u).length > 1;
   for (const [i, s] of stories.entries()) {
     if (photos[i]) continue;
-    photos[i] = isDefault(s.source_image) ? null : await sourcePhoto(s);
-    console.log(`  story ${i + 1}: ${photos[i] ? `the report's own photo (${photos[i].credit})` : "designed background"}`);
+    const r = isDefault(s.source_image) ? { why: "the report's image is the site's default picture" } : await sourcePhoto(s);
+    photos[i] = r.photo ?? null;
+    console.log(`  story ${i + 1}: ${r.photo ? `the report's own photo (${r.photo.credit})` : `designed background — ${r.why}`}`);
   }
   return photos;
 }
