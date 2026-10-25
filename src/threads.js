@@ -104,6 +104,12 @@ export async function postEditionToThreads(p, imageUrls) {
   return { permalink };
 }
 
+// The connected Threads profile (used by the "Check connections" workflow).
+export function whoAmI() {
+  if (!config.threadsToken) throw new Error("THREADS_ACCESS_TOKEN is not set");
+  return call("GET", "me", { fields: "id,username" }, 2);
+}
+
 // Long-lived Threads tokens last 60 days; refreshing (once the token is 24 h old) gives a fresh 60 days.
 export async function refreshThreadsToken() {
   const res = await fetch(`https://${config.threadsHost}/refresh_access_token?grant_type=th_refresh_token&access_token=${encodeURIComponent(config.threadsToken)}`, {

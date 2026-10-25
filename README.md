@@ -54,6 +54,7 @@ Free tiers cover everything: Gemini (about 3 calls per edition), Pixabay, GitHub
 |---|---|---|
 | **Post news** | 7 AM and 7 PM IST, or **Run workflow** (with *dry run* ticked it builds only) | Builds and posts the edition, hosts the slides on the `media` branch (latest post only), and saves `state/history.json` (avoids repeats) and `state/editions.json` (feeds the page) |
 | **Publish news page** | After every successful *Post news*, or a change to the page code | Rebuilds and publishes the GitHub Pages site. Pages source must be **GitHub Actions**. |
+| **Check connections** | Whenever you run it from the Actions tab | Confirms the Instagram and Threads keys work. It posts nothing. |
 | **Refresh Instagram token** | 1st and 15th of each month | Renews the 60-day Instagram and Threads tokens and saves them back as secrets |
 
 If a run fails, GitHub emails you, and the next run 12 hours later tries again. The slides from every run are kept on its run page for 7 days.

@@ -10,7 +10,8 @@
     "refresh-token": "node src/main.js refresh-token",
     "site": "node src/main.js site",
     "test": "node test/run.mjs",
-    "refresh-threads-token": "node src/main.js refresh-threads-token"
+    "refresh-threads-token": "node src/main.js refresh-threads-token",
+    "check": "node src/main.js check"
   },
   "keywords": [],
   "author": "",

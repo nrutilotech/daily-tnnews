@@ -86,6 +86,11 @@ export async function publishStory(imageUrl) {
   return mediaId;
 }
 
+// The connected account (used by the "Check connections" workflow).
+export function whoAmI() {
+  return api("GET", "me", { fields: "user_id,username" }, 2);
+}
+
 // Long-lived Instagram tokens last 60 days; refreshing (allowed once the token is 24 h old) gives a fresh 60 days.
 export async function refreshToken() {
   if (!config.igToken) throw new Error("IG_ACCESS_TOKEN is not set");

@@ -13,10 +13,10 @@ import { findPhotos } from "./images.js";
 import { readArticles } from "./article.js";
 import { shortenAll } from "./shorten.js";
 import { renderSlides, renderStory } from "./render.js";
-import { publishCarousel, publishStory, refreshToken } from "./instagram.js";
+import { publishCarousel, publishStory, refreshToken, whoAmI as instagramWhoAmI } from "./instagram.js";
 import { SAMPLE_EDITION } from "./sample.js";
 import { buildSite, saveEdition } from "./site.js";
-import { postEditionToThreads, refreshThreadsToken } from "./threads.js";
+import { postEditionToThreads, refreshThreadsToken, whoAmI as threadsWhoAmI } from "./threads.js";
 
 const NUM = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];
 
@@ -247,9 +247,31 @@ async function site() {
   console.log(`News page built from ${editions} edition(s) in ${path.relative(process.cwd(), dir) || dir}/`);
 }
 
-const run = { build, post, sample, site, "refresh-token": refresh, "refresh-threads-token": refreshThreads }[cmd];
+// Confirms the Instagram and Threads keys work, without posting anything.
+async function check() {
+  let ok = true;
+  try {
+    const ig = await instagramWhoAmI();
+    console.log(`✓ Instagram: connected as @${ig.username}`);
+  } catch (e) {
+    ok = false;
+    console.log(`✗ Instagram: ${e.message}`);
+  }
+  if (!config.threadsToken) console.log("– Threads: not set up (no THREADS_ACCESS_TOKEN)");
+  else
+    try {
+      const th = await threadsWhoAmI();
+      console.log(`✓ Threads: connected as @${th.username}`);
+    } catch (e) {
+      ok = false;
+      console.log(`✗ Threads: ${e.message}`);
+    }
+  if (!ok) throw new Error("a connection check failed");
+}
+
+const run = { build, post, sample, site, check, "refresh-token": refresh, "refresh-threads-token": refreshThreads }[cmd];
 if (!run) {
-  console.log("Usage: node src/main.js build | post | sample | site | refresh-token | refresh-threads-token");
+  console.log("Usage: node src/main.js build | post | sample | site | check | refresh-token | refresh-threads-token");
   process.exit(1);
 }
 run()
