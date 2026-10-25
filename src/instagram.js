@@ -78,6 +78,14 @@ export async function publishCarousel(imageUrls, caption) {
   return { mediaId, permalink };
 }
 
+// A single-image Story (1080×1920). Like the carousel, a publish that may have gone through is never repeated.
+export async function publishStory(imageUrl) {
+  const { id } = await api("POST", `${config.igUserId}/media`, { image_url: imageUrl, media_type: "STORIES" });
+  await waitReady(id, "story");
+  const { id: mediaId } = await api("POST", `${config.igUserId}/media_publish`, { creation_id: id }, 5, true);
+  return mediaId;
+}
+
 // Long-lived Instagram tokens last 60 days; refreshing (allowed once the token is 24 h old) gives a fresh 60 days.
 export async function refreshToken() {
   if (!config.igToken) throw new Error("IG_ACCESS_TOKEN is not set");

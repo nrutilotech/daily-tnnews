@@ -74,6 +74,7 @@ jobs:
           IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
           IG_GRAPH_HOST: ${{ vars.IG_GRAPH_HOST || 'graph.instagram.com' }}
           MEDIA_BASE_URL: https://raw.githubusercontent.com/${{ github.repository }}/media
+          POST_STORY: ${{ vars.POST_STORY || 'true' }}
 
       - name: Remember what was posted (avoids repeats next time)
         if: env.DRY_RUN != 'true'

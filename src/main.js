@@ -9,8 +9,8 @@ import { config } from "./config.js";
 import { collectHeadlines } from "./collect.js";
 import { curate } from "./curate.js";
 import { findPhotos } from "./images.js";
-import { renderSlides } from "./render.js";
-import { publishCarousel, refreshToken } from "./instagram.js";
+import { renderSlides, renderStory } from "./render.js";
+import { publishCarousel, publishStory, refreshToken } from "./instagram.js";
 import { SAMPLE_EDITION } from "./sample.js";
 
 const NUM = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];
@@ -60,7 +60,7 @@ function readHistory() {
   }
 }
 
-function writeOutput(edition, slides, meta, extra = {}) {
+function writeOutput(edition, slides, meta, extra = {}, story = null) {
   fs.rmSync(config.outDir, { recursive: true, force: true });
   fs.mkdirSync(config.outDir, { recursive: true });
   const files = slides.map((buf, i) => {
@@ -68,9 +68,10 @@ function writeOutput(edition, slides, meta, extra = {}) {
     fs.writeFileSync(path.join(config.outDir, name), buf);
     return name;
   });
+  if (story) fs.writeFileSync(path.join(config.outDir, "story.jpg"), story);
   const caption = buildCaption(edition, meta);
   fs.writeFileSync(path.join(config.outDir, "caption.txt"), caption);
-  fs.writeFileSync(path.join(config.outDir, "post.json"), JSON.stringify({ ...meta, ...extra, files, caption, edition }, null, 2));
+  fs.writeFileSync(path.join(config.outDir, "post.json"), JSON.stringify({ ...meta, ...extra, files, story: story ? "story.jpg" : null, caption, edition }, null, 2));
   // quick local preview page
   fs.writeFileSync(
     path.join(config.outDir, "preview.html"),
@@ -78,7 +79,7 @@ function writeOutput(edition, slides, meta, extra = {}) {
 <body style="margin:0;background:#111;color:#eee;font-family:sans-serif;padding:16px">
 <div style="display:flex;gap:12px;overflow-x:auto;scroll-snap-type:x mandatory">${files
       .map((f) => `<img src="${f}" style="height:80vh;scroll-snap-align:start;border-radius:8px">`)
-      .join("")}</div><pre style="white-space:pre-wrap;max-width:700px">${caption.replace(/</g, "&lt;")}</pre></body>`,
+      .join("")}${story ? `<img src="story.jpg" style="height:80vh;border-radius:8px;margin-left:24px">` : ""}</div><pre style="white-space:pre-wrap;max-width:700px">${caption.replace(/</g, "&lt;")}</pre></body>`,
   );
   return files;
 }
@@ -96,14 +97,16 @@ async function build() {
   const photos = await findPhotos(edition.stories);
   console.log("4/4 Drawing slides…");
   const slides = await renderSlides(edition, photos, meta);
-  const files = writeOutput(edition, slides, meta);
+  const story = await renderStory(edition, photos, meta);
+  const files = writeOutput(edition, slides, meta, {}, story);
   console.log(`Done: ${files.length} slides in out/ (open out/preview.html to check)`);
 }
 
 async function sample() {
   const meta = editionMeta();
-  const slides = await renderSlides(SAMPLE_EDITION, SAMPLE_EDITION.stories.map(() => null), meta);
-  writeOutput(SAMPLE_EDITION, slides, meta, { sample: true });
+  const photos = SAMPLE_EDITION.stories.map(() => null);
+  const slides = await renderSlides(SAMPLE_EDITION, photos, meta);
+  writeOutput(SAMPLE_EDITION, slides, meta, { sample: true }, await renderStory(SAMPLE_EDITION, photos, meta));
   console.log("Sample slides written to out/ — open out/preview.html");
 }
 
@@ -138,9 +141,28 @@ async function post() {
   const { mediaId, permalink } = await publishCarousel(urls, p.caption);
   console.log(`Posted! ${permalink ?? mediaId}`);
 
-  history.push({ id: p.id, postedAt: new Date().toISOString(), mediaId, headlines: p.edition.stories.map((s) => s.headline) });
-  fs.mkdirSync(path.dirname(config.stateFile), { recursive: true });
-  fs.writeFileSync(config.stateFile, JSON.stringify(history.slice(-6), null, 2));
+  const entry = { id: p.id, postedAt: new Date().toISOString(), mediaId, headlines: p.edition.stories.map((s) => s.headline) };
+  history.push(entry);
+  const saveHistory = () => {
+    fs.mkdirSync(path.dirname(config.stateFile), { recursive: true });
+    fs.writeFileSync(config.stateFile, JSON.stringify(history.slice(-6), null, 2));
+  };
+  saveHistory(); // saved before the Story, so a Story problem can't cause the edition to be posted again
+
+  // The Story is a bonus: if it fails, the carousel is already up and the run still succeeds.
+  if (config.postStory && p.story) {
+    try {
+      const storyUrl = `${config.mediaBaseUrl}/${p.id}/${p.story}`;
+      const r = await fetch(storyUrl, { method: "HEAD", signal: AbortSignal.timeout(15000) }).catch(() => null);
+      if (!r?.ok) throw new Error(`story image not reachable at ${storyUrl}`);
+      console.log("Publishing the Story…");
+      entry.storyId = await publishStory(storyUrl);
+      saveHistory();
+      console.log("Story posted.");
+    } catch (e) {
+      console.log(`::warning::Carousel posted, but the Story failed: ${e.message}`);
+    }
+  }
 }
 
 async function refresh() {

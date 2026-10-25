@@ -47,6 +47,8 @@ export const config = {
   mediaBaseUrl: env("MEDIA_BASE_URL").replace(/\/+$/, ""),
 
   dryRun: /^(1|true|yes)$/i.test(env("DRY_RUN", "false")),
+  // also post an Instagram Story announcing each edition (set POST_STORY=false to turn off)
+  postStory: !/^(0|false|no)$/i.test(env("POST_STORY", "true")),
 
   outDir: path.join(ROOT, "out"),
   stateFile: path.join(ROOT, "state", "history.json"),

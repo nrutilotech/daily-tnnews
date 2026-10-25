@@ -351,6 +351,123 @@ async function storySlide(story, photo, index, meta) {
   return cv.encode("jpeg", 90);
 }
 
+// Instagram Story (1080×1920) announcing the new edition. Instagram covers roughly the top 250 px
+// (progress bar, name) and bottom 250 px (reply bar), so all content sits between those.
+export async function renderStory(edition, photos, meta) {
+  registerFonts();
+  const SW = 1080;
+  const SH = 1920;
+  const cv = createCanvas(SW, SH);
+  const ctx = cv.getContext("2d");
+  const [top, ...rest] = edition.stories;
+  const color = CATEGORY_COLORS[top.category] ?? C.red;
+
+  // background: navy with a soft red glow behind the card
+  let g = ctx.createLinearGradient(0, 0, 0, SH);
+  g.addColorStop(0, "#0E2147");
+  g.addColorStop(1, "#060F22");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, SW, SH);
+  g = ctx.createRadialGradient(SW / 2, 760, 40, SW / 2, 760, 700);
+  g.addColorStop(0, "rgba(225,29,46,0.28)");
+  g.addColorStop(1, "rgba(225,29,46,0)");
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, SW, SH);
+
+  // header: wordmark, edition and date (centred)
+  ctx.font = font("bold", Math.round(34 * 1.5));
+  const [first, ...restWords] = config.brand.split(/\s+/);
+  const wmW = ctx.measureText(first).width + 28 * 1.5 + 12 * 1.5 + ctx.measureText(restWords.join(" ")).width;
+  wordmark(ctx, (SW - wmW) / 2, 270, 1.5);
+  ctx.textAlign = "center";
+  ctx.font = font("bold", 34);
+  ctx.fillStyle = C.yellow;
+  ctx.fillText(`${meta.editionLabel.toUpperCase()} IS LIVE`, SW / 2, 410);
+  ctx.font = font("semi", 30);
+  ctx.fillStyle = "rgba(255,255,255,0.8)";
+  ctx.fillText(meta.dateLabel, SW / 2, 458);
+  ctx.textAlign = "left";
+
+  // top-story card with its photo
+  const cx = 60;
+  const cy = 490;
+  const cw = SW - 120;
+  const ch = 600;
+  ctx.save();
+  ctx.shadowColor = "rgba(0,0,0,0.5)";
+  ctx.shadowBlur = 40;
+  ctx.shadowOffsetY = 12;
+  roundRect(ctx, cx, cy, cw, ch, 36);
+  ctx.fillStyle = C.navy;
+  ctx.fill();
+  ctx.restore();
+  ctx.save();
+  roundRect(ctx, cx, cy, cw, ch, 36);
+  ctx.clip();
+  if (photos[0]) drawImageCover(ctx, await loadImage(photos[0].buffer), cx, cy, cw, ch);
+  else fallbackBackground(ctx, cx, cy, cw, ch, color, top.category);
+  g = ctx.createLinearGradient(0, cy + ch * 0.3, 0, cy + ch);
+  g.addColorStop(0, "rgba(6,12,26,0)");
+  g.addColorStop(1, "rgba(6,12,26,0.95)");
+  ctx.fillStyle = g;
+  ctx.fillRect(cx, cy, cw, ch);
+  ctx.restore();
+  const pad = 44;
+  const head = fitText(ctx, top.headline, "bold", [62, 56, 50, 46], cw - pad * 2, 3);
+  const headH = head.lines.length * head.size * 1.14;
+  const headTop = cy + ch - pad - headH;
+  chip(ctx, `Top story · ${top.category}`, cx + pad, headTop - 74, color, "#fff", 26);
+  ctx.fillStyle = "#fff";
+  ctx.font = font("bold", head.size);
+  drawLines(ctx, head.lines, cx + pad, headTop + head.size * 0.92, head.size, 1.14);
+  if (photos[0]?.credit) credit(ctx, photos[0].credit, cx + cw - 28, cy + 44);
+
+  // "also in this edition": as many of the next headlines as fit above the button
+  const ctaY = 1560;
+  let y = cy + ch + 86;
+  ctx.font = font("bold", 30);
+  ctx.fillStyle = C.yellow;
+  ctx.letterSpacing = "3px";
+  ctx.fillText("ALSO IN THIS EDITION", cx, y);
+  ctx.letterSpacing = "0px";
+  y += 34;
+  const listW = cw - 90;
+  for (const [i, s] of rest.slice(0, 4).entries()) {
+    const line = fitText(ctx, s.headline, "semi", [31, 29, 27], listW, 2);
+    const rowH = Math.max(72, line.lines.length * line.size * 1.22 + 26);
+    if (y + rowH > ctaY - 20) break;
+    ctx.fillStyle = C.red;
+    roundRect(ctx, cx, y + 16, 64, 52, 12);
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.font = font("bold", 30);
+    ctx.textAlign = "center";
+    ctx.fillText(String(i + 2).padStart(2, "0"), cx + 32, y + 53);
+    ctx.textAlign = "left";
+    ctx.font = font("semi", line.size);
+    ctx.fillStyle = "#fff";
+    drawLines(ctx, line.lines, cx + 90, y + 16 + line.size * 1.05, line.size, 1.25);
+    y += rowH;
+  }
+
+  // call to action, kept above Instagram's reply bar
+  const cta = `SEE ALL ${edition.stories.length} ON OUR LATEST POST`;
+  ctx.font = font("bold", 32);
+  const ctaW = ctx.measureText(cta).width + 120;
+  ctx.fillStyle = C.yellow;
+  roundRect(ctx, (SW - ctaW) / 2, ctaY, ctaW, 84, 42);
+  ctx.fill();
+  ctx.fillStyle = C.navy;
+  ctx.textAlign = "center";
+  ctx.fillText(`${cta}  →`, SW / 2, ctaY + 54);
+  ctx.font = font("semi", 28);
+  ctx.fillStyle = "rgba(255,255,255,0.75)";
+  ctx.fillText(`Tap ${config.handle} at the top to open it`, SW / 2, ctaY + 128);
+  ctx.textAlign = "left";
+
+  return cv.encode("jpeg", 92);
+}
+
 export async function renderSlides(edition, photos, meta) {
   registerFonts();
   const m = { ...meta, total: edition.stories.length };

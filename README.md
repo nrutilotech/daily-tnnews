@@ -9,6 +9,7 @@ Every 12 hours (7 AM and 7 PM IST) this bot:
    - **Slide 1 (the cover):** the DAILY TNNEWS logo, the edition and date, the main story's photo and headline, "Last 12 hours · Top 10" and "Swipe →".
    - **Slides 2–10:** one story each, with its number, category, headline, key fact, summary and source.
 5. **Posts them as one Instagram carousel.** The caption gives the channel name, a summary of the last 12 hours, all 10 headlines as a numbered list, the sources and hashtags.
+6. **Posts a Story** (1080×1920) right after: "Morning/Evening edition is live", the top story with its photo, the next few headlines, and "See all 10 on our latest post". Stories posted through the API can't carry link stickers, so it points people to the profile. If the Story fails, the carousel stays up.
 
 Instagram allows at most **10 slides** in a carousel. That's why the main story goes on the cover rather than on a slide of its own.
 
@@ -60,6 +61,7 @@ Your own account can post without Meta's App Review, because you are the app's a
    | `NEWS_LANGUAGE` | `ta` | Tamil slides (default `en` = English) |
    | `INSTAGRAM_HANDLE` | `@dailytnnews` | Shown on the slides and in the caption |
    | `DRY_RUN` | `true` | Pause posting; slides are still built so you can check them |
+   | `POST_STORY` | `false` | Stop posting the Story (default: on) |
 
 ### 5. Automatic token renewal
 Create a GitHub token at <https://github.com/settings/personal-access-tokens>: choose *Fine-grained*, *Only this repository*, permission **Secrets: Read and write**. Save it as the `GH_PAT` secret. The *Refresh Instagram token* workflow then renews the Instagram token on the 1st and 15th of every month.
