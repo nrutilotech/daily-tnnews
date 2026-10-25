@@ -76,12 +76,12 @@ jobs:
           MEDIA_BASE_URL: https://raw.githubusercontent.com/${{ github.repository }}/media
           POST_STORY: ${{ vars.POST_STORY || 'true' }}
 
-      - name: Remember what was posted (avoids repeats next time)
+      - name: Remember what was posted (avoids repeats; feeds the news page)
         if: env.DRY_RUN != 'true'
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add state/history.json
+          git add state/history.json state/editions.json 2>/dev/null || git add state/history.json
           git diff --cached --quiet && exit 0
           git commit -qm "history: $(jq -r .id out/post.json)"
           # main may have moved on during the run (e.g. a code update): rebase and retry

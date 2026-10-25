@@ -3,6 +3,7 @@
 //   node src/main.js post     publish out/ to Instagram (needs MEDIA_BASE_URL hosting the slides)
 //   node src/main.js sample   render demo slides with dummy text (no API keys needed, never postable)
 //   node src/main.js refresh-token   print a refreshed 60-day Instagram token
+//   node src/main.js site     build the "link in bio" news page into site/
 import fs from "node:fs";
 import path from "node:path";
 import { config } from "./config.js";
@@ -12,6 +13,7 @@ import { findPhotos } from "./images.js";
 import { renderSlides, renderStory } from "./render.js";
 import { publishCarousel, publishStory, refreshToken } from "./instagram.js";
 import { SAMPLE_EDITION } from "./sample.js";
+import { buildSite, saveEdition } from "./site.js";
 
 const NUM = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];
 
@@ -34,6 +36,7 @@ function buildCaption(edition, meta) {
     ...edition.stories.map((s, i) => `${NUM[i]} ${s.caption_line}`),
     "",
     `👉 Swipe through all ${edition.stories.length} slides for the details.`,
+    `🔗 Full stories with links to the original reports: link in bio.`,
     `🔔 Follow ${config.handle} for Tamil Nadu news every morning & evening.`,
     "",
     `Sources: ${[...new Set(edition.stories.map((s) => s.source_name))].join(", ")}. Photos are illustrative.`,
@@ -148,6 +151,17 @@ async function post() {
     fs.writeFileSync(config.stateFile, JSON.stringify(history.slice(-6), null, 2));
   };
   saveHistory(); // saved before the Story, so a Story problem can't cause the edition to be posted again
+  // the "link in bio" news page is rebuilt from this list
+  saveEdition({
+    id: p.id,
+    editionLabel: p.editionLabel,
+    dateLabel: p.dateLabel,
+    postedAt: entry.postedAt,
+    permalink: permalink ?? null,
+    summary: p.edition.edition_summary,
+    files: p.files,
+    stories: p.edition.stories.map(({ category, headline, summary, key_fact, source_name, source_url }) => ({ category, headline, summary, key_fact, source_name, source_url })),
+  });
 
   // The Story is a bonus: if it fails, the carousel is already up and the run still succeeds.
   if (config.postStory && p.story) {
@@ -177,7 +191,12 @@ async function refresh() {
 }
 
 const cmd = process.argv[2];
-const run = { build, post, sample, "refresh-token": refresh }[cmd];
+async function site() {
+  const { editions, dir } = buildSite();
+  console.log(`News page built from ${editions} edition(s) in ${path.relative(process.cwd(), dir) || dir}/`);
+}
+
+const run = { build, post, sample, site, "refresh-token": refresh }[cmd];
 if (!run) {
   console.log("Usage: node src/main.js build | post | sample | refresh-token");
   process.exit(1);

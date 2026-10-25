@@ -7,7 +7,8 @@
     "build": "node src/main.js build",
     "post": "node src/main.js post",
     "sample": "node src/main.js sample",
-    "refresh-token": "node src/main.js refresh-token"
+    "refresh-token": "node src/main.js refresh-token",
+    "site": "node src/main.js site"
   },
   "keywords": [],
   "author": "",

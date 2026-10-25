@@ -1,0 +1,50 @@
+name: Publish news page
+
+# Rebuilds the "link in bio" page (https://<you>.github.io/<repo>/) after every post,
+# and whenever the page code changes. Needs Settings → Pages → Source: GitHub Actions.
+on:
+  workflow_run:
+    workflows: ["Post news"]
+    types: [completed]
+  push:
+    branches: [main]
+    paths: ["src/site.js", "state/editions.json", "brand/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  publish:
+    # after "Post news", only when it succeeded
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: main
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Build the page
+        run: npm run site
+        env:
+          INSTAGRAM_HANDLE: ${{ vars.INSTAGRAM_HANDLE || '@dailytnnews' }}
+          MEDIA_BASE_URL: https://raw.githubusercontent.com/${{ github.repository }}/media
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site/
+      - id: deploy
+        uses: actions/deploy-pages@v5

@@ -462,7 +462,7 @@ export async function renderStory(edition, photos, meta) {
   ctx.fillText(`${cta}  →`, SW / 2, ctaY + 54);
   ctx.font = font("semi", 28);
   ctx.fillStyle = "rgba(255,255,255,0.75)";
-  ctx.fillText(`Tap ${config.handle} at the top to open it`, SW / 2, ctaY + 128);
+  ctx.fillText(`Tap ${config.handle} above · full stories: link in bio`, SW / 2, ctaY + 128);
   ctx.textAlign = "left";
 
   return cv.encode("jpeg", 92);
