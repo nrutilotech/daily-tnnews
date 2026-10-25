@@ -30,7 +30,8 @@ export const config = {
   geminiKey: env("GEMINI_API_KEY"),
   researchModel: env("GEMINI_RESEARCH_MODEL", "gemini-2.5-flash"),
   writerModel: env("GEMINI_WRITER_MODEL", "gemini-3.8-flash"),
-  pexelsKey: env("PEXELS_API_KEY"),
+  pixabayKey: env("PIXABAY_API_KEY"),
+  pexelsKey: env("PEXELS_API_KEY"), // optional alternative; Pixabay is used when both are set
 
   igUserId: env("IG_USER_ID"),
   igToken: env("IG_ACCESS_TOKEN"),

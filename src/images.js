@@ -1,5 +1,5 @@
-// Step 3: find a free-to-use photo for each story (Pexels licence allows commercial use).
-// News-site photos are copyrighted, so they are never downloaded or reposted.
+// Step 3: find a free-to-use photo for each story from Pixabay (or Pexels, if that key is set).
+// Both licences allow commercial use. News-site photos are copyrighted, so they are never reposted.
 import { config } from "./config.js";
 
 const CATEGORY_FALLBACK_QUERY = {
@@ -19,27 +19,41 @@ const CATEGORY_FALLBACK_QUERY = {
   Politics: "Indian parliament",
 };
 
+// Each search returns { id, url, credit } or null.
+async function searchPixabay(query, used) {
+  const url = `https://pixabay.com/api/?key=${encodeURIComponent(config.pixabayKey)}&q=${encodeURIComponent(query.slice(0, 100))}&image_type=photo&safesearch=true&per_page=20&min_width=1000`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Pixabay ${res.status}`);
+  const data = await res.json();
+  // prefer portrait photos, but take any orientation if that's all there is
+  const hits = (data.hits ?? []).filter((h) => !used.has("pb" + h.id));
+  const p = hits.find((h) => h.imageHeight >= h.imageWidth) ?? hits[0];
+  return p && { id: "pb" + p.id, url: p.largeImageURL, credit: `Photo: ${p.user} / Pixabay` };
+}
+
 async function searchPexels(query, used) {
   const url = `https://api.pexels.com/v1/search?query=${encodeURIComponent(query)}&orientation=portrait&per_page=15&locale=en-US`;
   const res = await fetch(url, { headers: { Authorization: config.pexelsKey } });
   if (!res.ok) throw new Error(`Pexels ${res.status}`);
   const data = await res.json();
-  return (data.photos ?? []).find((p) => !used.has(p.id));
+  const p = (data.photos ?? []).find((p) => !used.has("px" + p.id));
+  return p && { id: "px" + p.id, url: p.src.large2x, credit: `Photo: ${p.photographer} / Pexels` };
 }
 
 export async function findPhotos(stories) {
+  const search = config.pixabayKey ? searchPixabay : config.pexelsKey ? searchPexels : null;
   const used = new Set();
   const out = [];
   for (const s of stories) {
     let photo = null;
-    if (config.pexelsKey) {
+    if (search) {
       for (const q of [s.image_query, CATEGORY_FALLBACK_QUERY[s.category]].filter(Boolean)) {
         try {
-          const p = await searchPexels(q, used);
+          const p = await search(q, used);
           if (p) {
             used.add(p.id);
-            const img = await fetch(p.src.large2x).then((r) => (r.ok ? r.arrayBuffer() : null));
-            if (img) photo = { buffer: Buffer.from(img), credit: `Photo: ${p.photographer} / Pexels` };
+            const img = await fetch(p.url).then((r) => (r.ok ? r.arrayBuffer() : null));
+            if (img) photo = { buffer: Buffer.from(img), credit: p.credit };
             break;
           }
         } catch (e) {

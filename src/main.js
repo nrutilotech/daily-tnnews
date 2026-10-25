@@ -36,7 +36,7 @@ function buildCaption(edition, meta) {
     `👉 Swipe through all ${edition.stories.length} slides for the details.`,
     `🔔 Follow ${config.handle} for Tamil Nadu news every morning & evening.`,
     "",
-    `Sources: ${[...new Set(edition.stories.map((s) => s.source_name))].join(", ")}. Photos are illustrative (Pexels).`,
+    `Sources: ${[...new Set(edition.stories.map((s) => s.source_name))].join(", ")}. Photos are illustrative.`,
     "",
     edition.hashtags.map((h) => "#" + h).join(" "),
   ];
