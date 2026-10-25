@@ -1,0 +1,81 @@
+name: Post news
+
+on:
+  schedule:
+    - cron: "30 1 * * *"   # 7:00 AM IST
+    - cron: "30 13 * * *"  # 7:00 PM IST
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Only build the slides (download them from the run page) — don't post"
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: post-news
+  cancel-in-progress: false
+
+jobs:
+  post:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      DRY_RUN: ${{ (inputs.dry_run || vars.DRY_RUN == 'true') && 'true' || 'false' }}
+      BRAND_NAME: ${{ vars.BRAND_NAME || 'DAILY TNNEWS' }}
+      INSTAGRAM_HANDLE: ${{ vars.INSTAGRAM_HANDLE || '@daily.tnnews' }}
+      NEWS_LANGUAGE: ${{ vars.NEWS_LANGUAGE || 'en' }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build slides (news feeds + Claude + photos)
+        run: npm run build
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+
+      - name: Keep a copy of the slides on the run page
+        uses: actions/upload-artifact@v4
+        with:
+          name: slides
+          path: out/
+          retention-days: 7
+
+      # Instagram downloads images from a public URL, so the slides are pushed to a
+      # "media" branch that only ever holds the latest post (no history piles up).
+      - name: Host slides on the media branch
+        if: env.DRY_RUN != 'true'
+        run: |
+          ID=$(jq -r .id out/post.json)
+          mkdir -p "/tmp/media/$ID" && cp out/*.jpg "/tmp/media/$ID/"
+          cd /tmp/media
+          git init -q -b media
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add . && git commit -qm "slides $ID"
+          git push -q -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" media
+
+      - name: Post to Instagram
+        run: npm run post
+        env:
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          IG_GRAPH_HOST: ${{ vars.IG_GRAPH_HOST || 'graph.instagram.com' }}
+          MEDIA_BASE_URL: https://raw.githubusercontent.com/${{ github.repository }}/media
+
+      - name: Remember what was posted (avoids repeats next time)
+        if: env.DRY_RUN != 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add state/history.json
+          git diff --cached --quiet || (git commit -qm "history: $(jq -r .id out/post.json)" && git push -q)

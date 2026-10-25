@@ -1,0 +1,26 @@
+{
+  "name": "daily-tnnews",
+  "version": "1.0.0",
+  "description": "DAILY TNNEWS: Tamil Nadu top-10 news carousel posted to Instagram every 12 hours",
+  "main": "src/main.js",
+  "scripts": {
+    "build": "node src/main.js build",
+    "post": "node src/main.js post",
+    "sample": "node src/main.js sample",
+    "refresh-token": "node src/main.js refresh-token"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@anthropic-ai/sdk": "^1.3.0",
+    "@napi-rs/canvas": "^1.0.13",
+    "rss-parser": "^3.13.0",
+    "zod": "^4.6.7"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "private": true
+}
