@@ -11,8 +11,8 @@ const Story = z.object({
   key_fact: z.string().describe("One extra figure/date/place NOT already in the headline (e.g. 'Red alert: Madurai, Theni'), max ~40 characters; empty string if nothing new to add"),
   caption_line: z.string().describe("One-line version for the Instagram caption list, max ~90 characters"),
   source_name: z.string().describe("Publisher the facts come from, exactly as shown in the headline list, e.g. The Hindu"),
-  source_url: z.string(),
-  image_query: z.string().describe("2–4 English words for a stock photo that fits, e.g. 'Chennai heavy rain street'. Never a person's name."),
+  source_number: z.number().int().describe("The number of the headline in the list above that this story is mainly based on"),
+  image_query: z.string().describe("2–4 English words describing a PLACE or OBJECT for a stock photo, e.g. 'government office counter', 'heavy rain street', 'paddy field'. Never people, faces, names, or ambiguous words like 'model', 'hub' or 'star'."),
 });
 
 const Edition = z.object({
@@ -98,7 +98,7 @@ function isRepeat(headline, previous) {
 }
 
 // Parse and validate the slide JSON; small slips (an unknown category, a stray "#") are repaired.
-function parseEdition(raw, previous = []) {
+function parseEdition(raw, previous = [], headlines = []) {
   let json;
   try {
     json = JSON.parse(raw.replace(/^```(?:json)?\s*|\s*```$/g, ""));
@@ -121,6 +121,12 @@ function parseEdition(raw, previous = []) {
   if (repeats.length) console.log(`  set aside ${repeats.length} story(ies) already posted: ${repeats.map((s) => s.headline).join(" | ")}`);
   edition.stories = [...fresh, ...repeats].slice(0, config.storyCount);
   edition.hashtags = [...new Set(edition.hashtags.map((h) => h.replace(/^#/, "").replace(/\s+/g, "")).filter(Boolean))].slice(0, 15);
+  // Link each story to the real article it came from (taken from the feed, never written by the AI).
+  for (const st of edition.stories) {
+    const h = headlines[st.source_number - 1];
+    st.source_url = h?.link || `https://news.google.com/search?q=${encodeURIComponent(st.headline)}&hl=en-IN&gl=IN&ceid=IN:en`;
+    if (h && !st.source_name) st.source_name = h.source;
+  }
   return edition;
 }
 
@@ -170,7 +176,7 @@ ${previous.map((h) => "- " + h).join("\n") || "(none)"}`;
       contents: [{ role: "user", parts: [{ text: `${input}\n\nPick the 12 best stories, most important first, and write them following the editorial rules and the field limits.` }] }],
       generationConfig: { responseMimeType: "application/json", responseJsonSchema: schema },
     },
-    (raw) => parseEdition(raw, previous),
+    (raw) => parseEdition(raw, previous, headlines),
     models,
   );
 }

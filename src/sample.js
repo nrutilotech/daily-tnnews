@@ -7,7 +7,7 @@ const s = (category, headline, summary, key_fact = "") => ({
   key_fact,
   caption_line: `SAMPLE: ${headline}`,
   source_name: "Sample Source",
-  source_url: "https://example.com",
+  source_number: 1,
   image_query: category,
 });
 
