@@ -7,13 +7,15 @@ const code = () => "tnn" + Array.from({ length: 5 }, () => SAFE[Math.floor(Math.
 const SERVICES = [
   ["v.gd", (u, c) => `https://v.gd/create.php?format=simple&url=${encodeURIComponent(u)}${c ? `&shorturl=${c}` : ""}`],
   ["is.gd", (u, c) => `https://is.gd/create.php?format=simple&url=${encodeURIComponent(u)}${c ? `&shorturl=${c}` : ""}`],
-  ["tinyurl.com", (u) => `https://tinyurl.com/api-create.php?url=${encodeURIComponent(u)}`],
+  ["tinyurl.com", (u, c) => `https://tinyurl.com/api-create.php?url=${encodeURIComponent(u)}${c ? `&alias=${c}` : ""}`],
 ];
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
-async function shortenOne(url) {
+// Some services refuse cloud servers (GitHub's included); one that fails is skipped for the rest of the run.
+async function shortenOne(url, dead) {
   if (!/^https?:\/\//.test(url ?? "")) return null;
   for (const [name, api] of SERVICES) {
+    if (dead.has(name)) continue;
     // a readable custom code first (retried once if taken), then the service's own code
     for (const c of [code(), code(), null]) {
       try {
@@ -21,20 +23,22 @@ async function shortenOne(url) {
         const text = (await res.text()).trim();
         if (res.ok && /^https:\/\/\S+$/.test(text) && text.length < 40) return text;
       } catch {
-        break; // service unreachable: go to the next one
+        break; // unreachable
       }
       await sleep(1100);
     }
-    console.warn(`  ${name} could not shorten a link; trying the next service`);
+    dead.add(name);
+    console.warn(`  ${name} isn't shortening links right now; using the next service`);
   }
   return null;
 }
 
 // One at a time with a short pause: these free services ask for gentle use.
 export async function shortenAll(urls) {
+  const dead = new Set();
   const out = [];
   for (const u of urls) {
-    out.push(await shortenOne(u));
+    out.push(await shortenOne(u, dead));
     await sleep(1100);
   }
   return out;
