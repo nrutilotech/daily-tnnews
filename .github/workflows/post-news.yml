@@ -80,6 +80,8 @@ jobs:
           IG_GRAPH_HOST: ${{ vars.IG_GRAPH_HOST || 'graph.instagram.com' }}
           MEDIA_BASE_URL: https://raw.githubusercontent.com/${{ github.repository }}/media
           POST_STORY: ${{ vars.POST_STORY || 'true' }}
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
 
       - name: Remember what was posted (avoids repeats; feeds the news page)
         if: env.DRY_RUN != 'true'

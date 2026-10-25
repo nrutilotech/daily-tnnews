@@ -16,8 +16,9 @@ Every 12 hours (7 AM and 7 PM IST) the bot posts a 10-slide carousel and a Story
    - **Carousel (1080×1350):** the cover carries the top story; slides 2–10 carry one story each, with category, headline, key fact, summary, source, short link and photo credit.
    - **Story (1080×1920):** "Edition is live", the top story, the next headlines, and "See all 10 on our latest post".
 7. **Post.**
-   - **Carousel:** posted with a caption giving the summary of the last 12 hours, the 10 headlines, "Full stories: link in bio", sources and hashtags.
+   - **Carousel:** posted with a caption giving the summary of the last 12 hours, then each numbered headline with its short link on the line below, "Full stories: link in bio", sources and hashtags.
    - **Story:** posted next. If the Story fails, the carousel stays up.
+   - **Threads:** the same edition goes to Threads (links are clickable there): the 10 slides with the summary, then one reply per story with a clickable link to the full report. This is on once the `THREADS_ACCESS_TOKEN` secret is set. If Threads fails, Instagram is unaffected.
    - **Safety:** an edition is never posted twice, a publish that may have gone through is never repeated, and a scheduled run skips if an edition went out in the last 6 hours (for example after a manual post).
 8. **News page.** <https://nrutilotech.github.io/daily-tnnews> is rebuilt after every post. It shows each story with its summary and a **Read the full story** button linking to the original report, plus the previous week of editions.
 
@@ -33,6 +34,7 @@ Free tiers cover everything: Gemini (about 3 calls per edition), Pixabay, GitHub
 | `PIXABAY_API_KEY` | Pixabay key, shown under *Parameters → key* at <https://pixabay.com/api/docs/> once logged in |
 | `IG_USER_ID` | Instagram user ID (Meta app → Instagram → API setup with Instagram login) |
 | `IG_ACCESS_TOKEN` | Instagram token (same page, *Generate token*). Renewed automatically. |
+| `THREADS_ACCESS_TOKEN` | (optional) Threads token for the page's Threads account. Renewed automatically with the Instagram token. |
 | `GH_PAT` | Fine-grained GitHub token for this repo with **Secrets: Read and write**. Lets the bot renew the Instagram token. Expires 24 Oct 2027, so make a new one before then. |
 
 **Variables** (optional, same page → *Variables*):
@@ -52,7 +54,7 @@ Free tiers cover everything: Gemini (about 3 calls per edition), Pixabay, GitHub
 |---|---|---|
 | **Post news** | 7 AM and 7 PM IST, or **Run workflow** (with *dry run* ticked it builds only) | Builds and posts the edition, hosts the slides on the `media` branch (latest post only), and saves `state/history.json` (avoids repeats) and `state/editions.json` (feeds the page) |
 | **Publish news page** | After every successful *Post news*, or a change to the page code | Rebuilds and publishes the GitHub Pages site. Pages source must be **GitHub Actions**. |
-| **Refresh Instagram token** | 1st and 15th of each month | Renews the 60-day Instagram token and saves it back as the secret |
+| **Refresh Instagram token** | 1st and 15th of each month | Renews the 60-day Instagram and Threads tokens and saves them back as secrets |
 
 If a run fails, GitHub emails you, and the next run 12 hours later tries again. The slides from every run are kept on its run page for 7 days.
 

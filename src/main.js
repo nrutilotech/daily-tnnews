@@ -16,6 +16,7 @@ import { renderSlides, renderStory } from "./render.js";
 import { publishCarousel, publishStory, refreshToken } from "./instagram.js";
 import { SAMPLE_EDITION } from "./sample.js";
 import { buildSite, saveEdition } from "./site.js";
+import { postEditionToThreads, refreshThreadsToken } from "./threads.js";
 
 const NUM = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];
 
@@ -35,8 +36,12 @@ function buildCaption(edition, meta) {
     `🕛 Tamil Nadu in the last ${config.windowHours} hours:`,
     edition.edition_summary,
     "",
-    ...edition.stories.map((s, i) => `${NUM[i]} ${s.caption_line}${s.short_url ? ` → ${s.short_url.replace(/^https?:\/\//, "")}` : ""}`),
-    "",
+    // each headline with its link on the line below (short link if we have one, else the article's address)
+    ...edition.stories.flatMap((s, i) => {
+      // no short link: point to the story on the news page rather than a very long article address
+      const link = (s.short_url || `${config.pageUrl}#${meta.id}-${i + 1}`).replace(/^https?:\/\/(www\.)?/, "");
+      return [`${NUM[i]} ${s.caption_line}`, ...(link ? [`🔗 ${link}`] : []), ""];
+    }),
     `👉 Swipe through all ${edition.stories.length} slides for the details.`,
     `🔗 Full stories with links to the original reports: link in bio.`,
     `🔔 Follow ${config.handle} for Tamil Nadu news every morning & evening.`,
@@ -201,17 +206,39 @@ async function post() {
       console.log(`::warning::Carousel posted, but the Story failed: ${e.message}`);
     }
   }
+
+  // Threads: the same edition as a thread with clickable links. Also a bonus — never fails the run.
+  if (config.threadsToken) {
+    try {
+      console.log("Posting the thread on Threads…");
+      const t = await postEditionToThreads(p, urls);
+      entry.threads = t.permalink ?? true;
+      saveHistory();
+      console.log(`Threads: posted with ${t.posted} story replies ${t.permalink ?? ""}`);
+    } catch (e) {
+      console.log(`::warning::Instagram posted, but Threads failed: ${e.message.slice(0, 200)}`);
+    }
+  }
+}
+
+// Saves a renewed token where the workflow's next step can store it as a secret (never in the log).
+function handOverToken(token, file, days) {
+  if (process.env.RUNNER_TEMP) {
+    console.log(`::add-mask::${token}`);
+    fs.writeFileSync(path.join(process.env.RUNNER_TEMP, file), token, { mode: 0o600 });
+  } else console.log(token);
+  console.log(`Token renewed — valid for ${days} more days`);
 }
 
 async function refresh() {
   const t = await refreshToken();
-  // In GitHub Actions the new token goes to a private temp file (never the log or a step output),
-  // and the workflow's next step saves it as the IG_ACCESS_TOKEN secret.
-  if (process.env.RUNNER_TEMP) {
-    console.log(`::add-mask::${t.access_token}`);
-    fs.writeFileSync(path.join(process.env.RUNNER_TEMP, "ig_token"), t.access_token, { mode: 0o600 });
-  } else console.log(t.access_token);
-  console.log(`Token renewed — valid for ${Math.round(t.expires_in / 86400)} more days`);
+  handOverToken(t.access_token, "ig_token", Math.round(t.expires_in / 86400));
+}
+
+async function refreshThreads() {
+  if (!config.threadsToken) return console.log("No THREADS_ACCESS_TOKEN set — nothing to renew.");
+  const t = await refreshThreadsToken();
+  handOverToken(t.access_token, "threads_token", Math.round(t.expires_in / 86400));
 }
 
 const cmd = process.argv[2];
@@ -220,9 +247,9 @@ async function site() {
   console.log(`News page built from ${editions} edition(s) in ${path.relative(process.cwd(), dir) || dir}/`);
 }
 
-const run = { build, post, sample, site, "refresh-token": refresh }[cmd];
+const run = { build, post, sample, site, "refresh-token": refresh, "refresh-threads-token": refreshThreads }[cmd];
 if (!run) {
-  console.log("Usage: node src/main.js build | post | sample | site | refresh-token");
+  console.log("Usage: node src/main.js build | post | sample | site | refresh-token | refresh-threads-token");
   process.exit(1);
 }
 run()

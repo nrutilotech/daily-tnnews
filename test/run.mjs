@@ -217,6 +217,65 @@ await test("short links: readable code from v.gd; falls back to the next service
   assert.equal(three, null);
 });
 
+const threadsEdition = {
+  id: "2026102514",
+  editionLabel: "Evening Edition",
+  dateLabel: "25 October 2026",
+  edition: {
+    edition_summary: "A long summary. ".repeat(40),
+    stories: SAMPLE_EDITION.stories.map((s, i) => ({ ...s, summary: "Detail ".repeat(80), source_url: `https://www.example.com/news/tamil-nadu/a-very-long-article-address-${i}-${"x".repeat(60)}` })),
+  },
+};
+
+await test("Threads: every post fits the 500-character limit and keeps its link whole", async () => {
+  process.env.THREADS_ACCESS_TOKEN = "t";
+  const { threadTexts } = await import("../src/threads.js");
+  const { intro, replies } = threadTexts(threadsEdition, { pageUrl: "https://example.github.io/news/" });
+  for (const t of [intro, ...replies.map((r) => r.text)]) assert.ok(Buffer.byteLength(t) <= 500, `${Buffer.byteLength(t)} bytes`);
+  assert.ok(replies[0].text.includes(threadsEdition.edition.stories[0].source_url), "full link kept");
+  assert.equal(replies.length, 10);
+});
+
+await test("Threads: carousel first, then 10 replies chained one after another", async () => {
+  const { config } = await import("../src/config.js");
+  config.threadsToken = "t";
+  config.threadsUserId = "99";
+  const log = [];
+  let n = 0;
+  handler = (url, opts) => {
+    const body = opts.body ? Object.fromEntries(new URLSearchParams(opts.body)) : {};
+    if ((opts.method ?? "GET") === "GET") return ok(url.includes("permalink") ? { permalink: "https://www.threads.net/@dailytnnews/post/x" } : { status: "FINISHED" });
+    if (url.endsWith("/threads_publish")) return ok({ id: "P" + body.creation_id });
+    log.push(body.media_type + (body.reply_to_id ? `<-${body.reply_to_id}` : ""));
+    return ok({ id: "C" + ++n });
+  };
+  const { postEditionToThreads } = await import("../src/threads.js");
+  const r = await quiet(() => postEditionToThreads(threadsEdition, ["https://img/1", "https://img/2"]));
+  assert.equal(r.posted, 10);
+  assert.equal(log.filter((l) => l === "IMAGE").length, 2);
+  assert.ok(log.includes("CAROUSEL"));
+  const replies = log.filter((l) => l.startsWith("TEXT<-"));
+  assert.equal(replies.length, 10);
+  assert.equal(replies[0], "TEXT<-PC3"); // first reply answers the published carousel
+  assert.equal(replies[1], "TEXT<-PC4"); // each next reply answers the previous one
+});
+
+await test("Threads: if the images fail, the intro is posted as text and replies still follow", async () => {
+  const log = [];
+  handler = (url, opts) => {
+    const body = opts.body ? Object.fromEntries(new URLSearchParams(opts.body)) : {};
+    if ((opts.method ?? "GET") === "GET") return ok({ status: "FINISHED" });
+    if (url.endsWith("/threads_publish")) return ok({ id: "P" + body.creation_id });
+    if (body.media_type === "IMAGE") return fail(400, { message: "bad image" });
+    log.push(body.media_type);
+    return ok({ id: "C" + log.length });
+  };
+  const { postEditionToThreads } = await import("../src/threads.js");
+  const r = await quiet(() => postEditionToThreads(threadsEdition, ["https://img/1"]));
+  assert.equal(log[0], "TEXT");
+  assert.equal(r.posted, 10);
+});
+
 await test("workflow files are in place", async () => {
   for (const f of ["post-news.yml", "news-page.yml", "refresh-token.yml"]) assert.ok(fs.existsSync(new URL(`../.github/workflows/${f}`, import.meta.url)), f);
   const post = fs.readFileSync(new URL("../.github/workflows/post-news.yml", import.meta.url), "utf8");

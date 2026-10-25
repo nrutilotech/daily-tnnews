@@ -28,6 +28,17 @@ jobs:
         run: gh secret set IG_ACCESS_TOKEN --repo "${{ github.repository }}" < "$RUNNER_TEMP/ig_token"
         env:
           GH_TOKEN: ${{ secrets.GH_PAT }}
+      - name: Renew the Threads token too (if Threads is set up)
+        id: threads
+        run: npm run refresh-threads-token
+        env:
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+      - name: Save the new Threads token
+        run: |
+          [ -f "$RUNNER_TEMP/threads_token" ] || exit 0
+          gh secret set THREADS_ACCESS_TOKEN --repo "${{ github.repository }}" < "$RUNNER_TEMP/threads_token"
+        env:
+          GH_TOKEN: ${{ secrets.GH_PAT }}
       - name: Clean up
         if: always()
-        run: rm -f "$RUNNER_TEMP/ig_token"
+        run: rm -f "$RUNNER_TEMP/ig_token" "$RUNNER_TEMP/threads_token"

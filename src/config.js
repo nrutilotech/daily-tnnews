@@ -46,6 +46,16 @@ export const config = {
   mediaBaseUrl: env("MEDIA_BASE_URL").replace(/\/+$/, ""),
 
   dryRun: /^(1|true|yes)$/i.test(env("DRY_RUN", "false")),
+  // Threads cross-posting (links are clickable there); off until THREADS_ACCESS_TOKEN is set
+  threadsToken: env("THREADS_ACCESS_TOKEN"),
+  threadsUserId: env("THREADS_USER_ID"),
+  threadsHost: env("THREADS_HOST", "graph.threads.net"),
+  // the "link in bio" news page (GitHub Pages)
+  pageUrl:
+    env("PAGE_URL") ||
+    (process.env.GITHUB_REPOSITORY
+      ? `https://${process.env.GITHUB_REPOSITORY.split("/")[0]}.github.io/${process.env.GITHUB_REPOSITORY.split("/")[1]}/`
+      : "https://nrutilotech.github.io/daily-tnnews/"),
   // also post an Instagram Story announcing each edition (set POST_STORY=false to turn off)
   postStory: !/^(0|false|no)$/i.test(env("POST_STORY", "true")),
 

@@ -9,7 +9,8 @@
     "sample": "node src/main.js sample",
     "refresh-token": "node src/main.js refresh-token",
     "site": "node src/main.js site",
-    "test": "node test/run.mjs"
+    "test": "node test/run.mjs",
+    "refresh-threads-token": "node src/main.js refresh-threads-token"
   },
   "keywords": [],
   "author": "",
