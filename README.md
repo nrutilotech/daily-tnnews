@@ -3,7 +3,7 @@
 Every 12 hours (7 AM and 7 PM IST) this bot:
 
 1. **Collects** the last 12 hours of Tamil Nadu headlines from news feeds (The Hindu TN and Chennai, Times of India Chennai, and Google News searches for government, weather, sports, business, education, health, agriculture, plus a Tamil-language search).
-2. **Asks Gemini** (Google's AI, free tier) to check the news with Google Search and pick the **top 10**. Government announcements and policies come first, then weather, sports and other sectors. Gemini writes a short headline, a 2–3 sentence summary and a key fact for each story, in its own words, and names the source.
+2. **Asks Gemini** (Google's AI, free tier) to read the headlines and pick the **top 10**. Government announcements and policies come first, then weather, sports and other sectors. Gemini writes a short headline, a 2–3 sentence summary and a key fact for each story, in its own words, and names the source.
 3. **Finds a photo** for each story on Pixabay. Pixabay photos are free to use, so no news-site photos are reposted.
 4. **Draws 10 slides** (1080×1350):
    - **Slide 1 (the cover):** the DAILY TNNEWS logo, the edition and date, the main story's photo and headline, "Last 12 hours · Top 10" and "Swipe →".
@@ -31,7 +31,7 @@ Instagram allows at most **10 slides** in a carousel. That's why the main story 
 Your own account can post without Meta's App Review, because you are the app's admin.
 
 ### 3. API keys
-- **Gemini (free):** <https://aistudio.google.com/apikey> → sign in with Google → **Create API key** → `GEMINI_API_KEY`. The free tier covers this bot (2 posts a day). Research uses `gemini-2.5-flash`, the model whose Google Search is free (500 a day); slides are written with `gemini-3.8-flash`. If Google retires the older model, the bot falls back to the news-feed headlines; change the models with the `GEMINI_RESEARCH_MODEL` / `GEMINI_WRITER_MODEL` variables. Note: on the free tier Google may use requests to improve its products. That's fine here, because everything sent is public news.
+- **Gemini (free):** <https://aistudio.google.com/apikey> → sign in with Google → **Create API key** → `GEMINI_API_KEY`. The free tier covers this bot (2 posts a day). It works from the news-feed headlines; Google Search grounding is not free for new users, but you can set the `GEMINI_RESEARCH_MODEL` variable to a paid model to add it. Note: on the free tier Google may use requests to improve its products. That's fine here, because everything sent is public news.
 - **Pixabay (free):** sign up at <https://pixabay.com>, then open <https://pixabay.com/api/docs/>. Your key is shown under *Parameters → key* → `PIXABAY_API_KEY`. (Pexels stopped issuing new keys in 2026; an existing Pexels key also works as `PEXELS_API_KEY`.)
 
 ### 4. Put the code on GitHub (free hosting and scheduler)

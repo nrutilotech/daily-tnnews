@@ -26,9 +26,10 @@ export const config = {
   windowHours: Number(env("WINDOW_HOURS", "12")),
   storyCount: 10, // Instagram carousels allow at most 10 slides: cover (story 1) + 9 more
 
-  // Gemini API (free tier). Google Search grounding is free only on gemini-2.5-flash.
+  // Gemini API (free tier). Google Search grounding isn't free for new users, so by default the bot
+  // works from the feed headlines only. Set GEMINI_RESEARCH_MODEL (e.g. a paid model) to add search.
   geminiKey: env("GEMINI_API_KEY"),
-  researchModel: env("GEMINI_RESEARCH_MODEL", "gemini-2.5-flash"),
+  researchModel: env("GEMINI_RESEARCH_MODEL", ""),
   writerModel: env("GEMINI_WRITER_MODEL", "gemini-3.8-flash"),
   pixabayKey: env("PIXABAY_API_KEY"),
   pexelsKey: env("PEXELS_API_KEY"), // optional alternative; Pixabay is used when both are set

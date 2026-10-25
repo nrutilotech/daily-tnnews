@@ -74,7 +74,10 @@ Pick the 10 best stories, most important first. For each give: category, the key
   // Pass 1 — research. Google Search grounding is free only on the older Flash model, so try that first
   // and fall back to working from the feed headlines alone if it is unavailable or over its limit.
   let brief;
-  try {
+  if (!config.researchModel) {
+    console.log(`  Gemini (${config.writerModel}): reading the feed headlines…`);
+    brief = await gemini(config.writerModel, { contents: [{ role: "user", parts: [{ text: task }] }] });
+  } else try {
     console.log(`  Gemini (${config.researchModel} + Google Search): researching…`);
     brief = await gemini(config.researchModel, {
       contents: [{ role: "user", parts: [{ text: task + "\n\nUse Google Search to confirm the important stories and to find anything missing — especially Tamil Nadu government orders/schemes/announcements, the Chennai Regional Meteorological Centre / IMD weather outlook, and sports." }] }],
@@ -102,8 +105,8 @@ Pick the 10 best stories, most important first. For each give: category, the key
   try {
     raw = await gemini(config.writerModel, request);
   } catch (e) {
-    console.warn(`  ${e.message}; retrying with ${config.researchModel}`);
-    raw = await gemini(config.researchModel, request);
+    console.warn(`  ${e.message}; retrying once`);
+    raw = await gemini(config.writerModel, request);
   }
   const parsed = Edition.safeParse(JSON.parse(raw.replace(/^```(?:json)?\s*|\s*```$/g, "")));
   if (!parsed.success) throw new Error(`Gemini's slide JSON did not match the expected format: ${parsed.error.message.slice(0, 300)}`);
