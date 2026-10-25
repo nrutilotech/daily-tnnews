@@ -210,11 +210,11 @@ async function post() {
   // Threads: the same edition as a thread with clickable links. Also a bonus — never fails the run.
   if (config.threadsToken) {
     try {
-      console.log("Posting the thread on Threads…");
+      console.log("Posting on Threads…");
       const t = await postEditionToThreads(p, urls);
       entry.threads = t.permalink ?? true;
       saveHistory();
-      console.log(`Threads: posted with ${t.posted} story replies ${t.permalink ?? ""}`);
+      console.log(`Threads: posted ${t.permalink ?? ""}`);
     } catch (e) {
       console.log(`::warning::Instagram posted, but Threads failed: ${e.message.slice(0, 200)}`);
     }

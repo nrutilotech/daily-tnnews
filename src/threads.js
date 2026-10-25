@@ -1,6 +1,5 @@
-// Threads (Instagram's sister app): links there ARE clickable. Each edition becomes a thread:
-//   post 1  – the 10 slides as a carousel + the edition summary
-//   replies – one per story: headline, short summary and a clickable link to the original report
+// Threads (Instagram's sister app): each edition is one post — the 10 slides as a carousel with the
+// edition summary and a link to the news page (links are clickable on Threads). No replies or comments.
 // Needs a Threads account for the page and a Threads access token (THREADS_ACCESS_TOKEN); see README.
 import { config } from "./config.js";
 
@@ -71,29 +70,24 @@ export async function threadsUserId() {
   return id;
 }
 
-// Builds the texts for an edition (exported for tests).
-export function threadTexts(p, { pageUrl = config.pageUrl } = {}) {
-  const intro = fitText(
+// The post text (exported for tests).
+export function threadText(p, { pageUrl = config.pageUrl } = {}) {
+  return fitText(
     [
       `📰 ${config.brand} | ${p.dateLabel} · ${p.editionLabel}`,
       `Tamil Nadu in the last ${config.windowHours} hours: ${p.edition.edition_summary}`,
-      `🧵 All ${p.edition.stories.length} stories with links to the full reports below 👇`,
-      pageUrl ? `🔗 ${pageUrl}` : "",
+      `👉 Swipe for all ${p.edition.stories.length} stories`,
+      pageUrl ? `🔗 Full stories with links: ${pageUrl}` : "",
     ],
     1,
   );
-  const replies = p.edition.stories.map((s, i) => ({
-    text: fitText([`${i + 1}. ${s.headline}`, s.summary, `🔗 Full story (${s.source_name}): ${s.source_url}`], 1),
-    link: /^https?:\/\//.test(s.source_url ?? "") ? s.source_url : null,
-  }));
-  return { intro, replies };
 }
 
-// Posts the edition as a thread. Returns { permalink, posted } (posted = number of replies published).
+// Posts the edition as one Threads post. Returns { permalink }.
 export async function postEditionToThreads(p, imageUrls) {
   if (!config.threadsToken) throw new Error("THREADS_ACCESS_TOKEN is not set");
   const uid = await threadsUserId();
-  const { intro, replies } = threadTexts(p);
+  const intro = threadText(p);
 
   // 1. carousel of the slides with the intro text (falls back to a text post if images fail)
   let rootContainer;
@@ -106,22 +100,8 @@ export async function postEditionToThreads(p, imageUrls) {
     rootContainer = await create(uid, { media_type: "TEXT", text: intro }, "intro");
   }
   const rootId = await publish(uid, rootContainer);
-  console.log("  Threads: posted the edition");
-
-  // 2. one reply per story, each answering the previous one so they read as a single thread
-  let prev = rootId;
-  let posted = 0;
-  for (const [i, r] of replies.entries()) {
-    try {
-      const c = await create(uid, { media_type: "TEXT", text: r.text, reply_to_id: prev, ...(r.link ? { link_attachment: r.link } : {}) }, `story ${i + 1}`);
-      prev = await publish(uid, c);
-      posted++;
-    } catch (e) {
-      console.log(`  Threads: story ${i + 1} failed (${e.message.slice(0, 120)})`);
-    }
-  }
   const { permalink } = await call("GET", rootId, { fields: "permalink" }, 2).catch(() => ({}));
-  return { permalink, posted };
+  return { permalink };
 }
 
 // Long-lived Threads tokens last 60 days; refreshing (once the token is 24 h old) gives a fresh 60 days.

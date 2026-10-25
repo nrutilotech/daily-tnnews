@@ -18,7 +18,7 @@ Every 12 hours (7 AM and 7 PM IST) the bot posts a 10-slide carousel and a Story
 7. **Post.**
    - **Carousel:** posted with a caption giving the summary of the last 12 hours, then each numbered headline with its short link on the line below, "Full stories: link in bio", sources and hashtags.
    - **Story:** posted next. If the Story fails, the carousel stays up.
-   - **Threads:** the same edition goes to Threads (links are clickable there): the 10 slides with the summary, then one reply per story with a clickable link to the full report. This is on once the `THREADS_ACCESS_TOKEN` secret is set. If Threads fails, Instagram is unaffected.
+   - **Threads:** the same edition goes to Threads as one post: the 10 slides with the summary and a clickable link to the news page. There are no replies or comments. This is on once the `THREADS_ACCESS_TOKEN` secret is set. If Threads fails, Instagram is unaffected.
    - **Safety:** an edition is never posted twice, a publish that may have gone through is never repeated, and a scheduled run skips if an edition went out in the last 6 hours (for example after a manual post).
 8. **News page.** <https://nrutilotech.github.io/daily-tnnews> is rebuilt after every post. It shows each story with its summary and a **Read the full story** button linking to the original report, plus the previous week of editions.
 
