@@ -17,7 +17,7 @@ const Story = z.object({
 
 const Edition = z.object({
   edition_summary: z.string().describe("2–3 sentences: what happened in Tamil Nadu in the last 12 hours"),
-  stories: z.array(Story).describe("Exactly 10 different stories, most important first; stories[0] is the cover story"),
+  stories: z.array(Story).describe("12 different stories, most important first; stories[0] is the cover story"),
   hashtags: z.array(z.string()).describe("10–15 relevant hashtags without the # sign"),
 });
 
@@ -85,8 +85,20 @@ async function geminiOnce(model, body) {
   return text;
 }
 
+// Words that identify a story, for spotting repeats of earlier posts.
+const STOP = new Set("with from that this have been over into after their about amid says said will tamil nadu chennai govt government state".split(" "));
+const words = (t) => new Set(t.toLowerCase().replace(/[^a-z0-9஀-௿ ]/g, " ").split(/\s+/).filter((w) => w.length > 3 && !STOP.has(w)));
+function isRepeat(headline, previous) {
+  const a = words(headline);
+  return previous.some((p) => {
+    const b = words(p);
+    const shared = [...a].filter((w) => b.has(w)).length;
+    return shared >= 3 && shared / Math.min(a.size, b.size) >= 0.5;
+  });
+}
+
 // Parse and validate the slide JSON; small slips (an unknown category, a stray "#") are repaired.
-function parseEdition(raw) {
+function parseEdition(raw, previous = []) {
   let json;
   try {
     json = JSON.parse(raw.replace(/^```(?:json)?\s*|\s*```$/g, ""));
@@ -103,7 +115,11 @@ function parseEdition(raw) {
   const seen = new Set();
   edition.stories = edition.stories.filter((s) => !seen.has(s.headline.toLowerCase()) && seen.add(s.headline.toLowerCase()));
   if (edition.stories.length < 5) throw new Error(`returned only ${edition.stories.length} stories`);
-  edition.stories = edition.stories.slice(0, config.storyCount);
+  // Prefer fresh stories: repeats of earlier posts are only used if there aren't enough new ones.
+  const fresh = edition.stories.filter((s) => !isRepeat(s.headline, previous));
+  const repeats = edition.stories.filter((s) => isRepeat(s.headline, previous));
+  if (repeats.length) console.log(`  set aside ${repeats.length} story(ies) already posted: ${repeats.map((s) => s.headline).join(" | ")}`);
+  edition.stories = [...fresh, ...repeats].slice(0, config.storyCount);
   edition.hashtags = [...new Set(edition.hashtags.map((h) => h.replace(/^#/, "").replace(/\s+/g, "")).filter(Boolean))].slice(0, 15);
   return edition;
 }
@@ -151,10 +167,10 @@ ${previous.map((h) => "- " + h).join("\n") || "(none)"}`;
   delete schema.$schema;
   return gemini(
     {
-      contents: [{ role: "user", parts: [{ text: `${input}\n\nPick the ${config.storyCount} best stories, most important first, and write them following the editorial rules and the field limits.` }] }],
+      contents: [{ role: "user", parts: [{ text: `${input}\n\nPick the 12 best stories, most important first, and write them following the editorial rules and the field limits.` }] }],
       generationConfig: { responseMimeType: "application/json", responseJsonSchema: schema },
     },
-    parseEdition,
+    (raw) => parseEdition(raw, previous),
     models,
   );
 }
