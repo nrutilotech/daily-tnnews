@@ -40,10 +40,19 @@ function storyCard(s, i, editionId) {
 </article>`;
 }
 
-export function buildSite(mediaBaseUrl = config.mediaBaseUrl) {
+export async function buildSite(mediaBaseUrl = config.mediaBaseUrl) {
   const editions = readEditions();
   const [latest, ...older] = editions;
   const handle = config.handle.replace(/^@/, "");
+
+  // the media branch only holds the latest *posted* slides; skip the strip if they're not there
+  let slidesHosted = false;
+  if (mediaBaseUrl && latest?.files?.length) {
+    const r = await fetch(`${mediaBaseUrl}/${latest.id}/${latest.files[0]}`, { method: "HEAD", signal: AbortSignal.timeout(15000) }).catch(() => null);
+    slidesHosted = !!r?.ok;
+  }
+  const [owner, repo] = (process.env.GITHUB_REPOSITORY || "").split("/");
+  const pageUrl = owner && repo ? `https://${owner}.github.io/${repo}/` : "";
 
   const latestHtml = latest
     ? `<section class="edition latest" id="${esc(latest.id)}">
@@ -52,7 +61,7 @@ export function buildSite(mediaBaseUrl = config.mediaBaseUrl) {
   <p class="summary">${esc(latest.summary)}</p>
   ${latest.permalink ? `<a class="ig" href="${esc(safeUrl(latest.permalink))}" target="_blank" rel="noopener">View this edition on Instagram</a>` : ""}
   ${
-    mediaBaseUrl && latest.files?.length
+    slidesHosted
       ? `<div class="slides" aria-label="Slides from this edition">${latest.files
           .map((f, i) => `<img src="${esc(`${mediaBaseUrl}/${latest.id}/${f}`)}" alt="Slide ${i + 1}" loading="lazy" width="1080" height="1350">`)
           .join("")}</div>`
@@ -83,7 +92,8 @@ export function buildSite(mediaBaseUrl = config.mediaBaseUrl) {
 <link rel="icon" href="icon.png">
 <meta property="og:title" content="${esc(config.brand)}">
 <meta property="og:description" content="Tamil Nadu's top 10 news, twice a day. ${esc(updated)}">
-<meta property="og:image" content="icon.png">
+<meta property="og:image" content="${pageUrl}icon.png">${pageUrl ? `
+<link rel="canonical" href="${pageUrl}">` : ""}
 <style>
   :root { --navy:#0A1A33; --red:#E11D2E; --yellow:#FFC93C; --paper:#F7F5F0; --ink:#0F172A; --gray:#475467; --card:#FFFFFF; --line:#E4DFD3; }
   @media (prefers-color-scheme: dark) { :root { --paper:#0B1220; --ink:#F1F5F9; --gray:#A8B3C4; --card:#131C2E; --line:#22304A; } }

@@ -34,7 +34,6 @@ export const config = {
   // tried in order when the main model is busy or unavailable (all on the free tier)
   backupModels: env("GEMINI_BACKUP_MODELS", "gemini-3.6-flash,gemini-3.5-flash-lite").split(",").map((s) => s.trim()),
   pixabayKey: env("PIXABAY_API_KEY"),
-  pexelsKey: env("PEXELS_API_KEY"), // optional alternative; Pixabay is used when both are set
 
   igUserId: env("IG_USER_ID"),
   igToken: env("IG_ACCESS_TOKEN"),

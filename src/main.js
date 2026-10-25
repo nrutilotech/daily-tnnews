@@ -142,6 +142,13 @@ async function post() {
     console.log(`Edition ${p.id} was already posted — skipping so it isn't posted twice.`);
     return;
   }
+  // A late scheduled run right after a manual post would only repeat the news: skip it.
+  const last = history[history.length - 1];
+  const hoursSince = last ? (Date.now() - Date.parse(last.postedAt)) / 3600000 : Infinity;
+  if (process.env.GITHUB_EVENT_NAME === "schedule" && hoursSince < 6) {
+    console.log(`An edition was posted ${hoursSince.toFixed(1)} hours ago — skipping this scheduled run.`);
+    return;
+  }
   // make sure every slide is being served before Instagram tries to fetch them
   for (const url of urls) {
     let ok = false;
@@ -204,13 +211,13 @@ async function refresh() {
 
 const cmd = process.argv[2];
 async function site() {
-  const { editions, dir } = buildSite();
+  const { editions, dir } = await buildSite();
   console.log(`News page built from ${editions} edition(s) in ${path.relative(process.cwd(), dir) || dir}/`);
 }
 
 const run = { build, post, sample, site, "refresh-token": refresh }[cmd];
 if (!run) {
-  console.log("Usage: node src/main.js build | post | sample | refresh-token");
+  console.log("Usage: node src/main.js build | post | sample | site | refresh-token");
   process.exit(1);
 }
 run()

@@ -107,7 +107,7 @@ ${s.article_text || "(the article could not be read — use the headline and sum
           },
         ],
       },
-      contents: [{ role: "user", parts: [{ text: `For each story below, read the full article, then:\n- describe what a fitting illustrative photo shows and give 2–3 short search terms;\n- check the slide summary and key fact against the article. If the article contradicts them or they add facts not in it, rewrite them from the article (summary max ~200 characters, key fact max ~40). Otherwise repeat them unchanged.\n\n${list}` }] }],
+      contents: [{ role: "user", parts: [{ text: `For each story below, read the full article, then:\n- describe what a fitting illustrative photo shows and give 2–3 short search terms;\n- check the slide summary and key fact against the article. If the article contradicts them or they add facts not in it, rewrite them from the article in the same language as the slide text (summary max ~200 characters, key fact max ~40). Otherwise repeat them unchanged.\n\n${list}` }] }],
       generationConfig: { responseMimeType: "application/json", responseJsonSchema: schemaOf(Brief) },
     },
     json(Brief),

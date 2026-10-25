@@ -1,107 +1,86 @@
-# DAILY TNNEWS: automatic Tamil Nadu news carousel
+# DAILY TNNEWS: automatic Tamil Nadu news on Instagram
 
-Every 12 hours (7 AM and 7 PM IST) this bot:
+Every 12 hours (7 AM and 7 PM IST) the bot posts a 10-slide carousel and a Story with the top 10 Tamil Nadu news of the last 12 hours, and updates a "link in bio" news page with links to the full reports.
 
-1. **Collects** the last 12 hours of Tamil Nadu headlines from news feeds (The Hindu TN and Chennai, Times of India Chennai, and Google News searches for government, weather, sports, business, education, health, agriculture, plus a Tamil-language search).
-2. **Asks Gemini** (Google's AI, free tier) to read the headlines and pick the **top 10**. Government announcements and policies come first, then weather, sports and other sectors. Gemini writes a short headline, a 2–3 sentence summary and a key fact for each story, in its own words, and names the source.
-3. **Finds a photo** for each story on Pixabay. Pixabay photos are free to use, so no news-site photos are reposted.
-4. **Draws 10 slides** (1080×1350):
-   - **Slide 1 (the cover):** the DAILY TNNEWS logo, the edition and date, the main story's photo and headline, "Last 12 hours · Top 10" and "Swipe →".
-   - **Slides 2–10:** one story each, with its number, category, headline, key fact, summary and source.
-5. **Posts them as one Instagram carousel.** The caption gives the channel name, a summary of the last 12 hours, all 10 headlines as a numbered list, the sources and hashtags.
-6. **Posts a Story** (1080×1920) right after: "Morning/Evening edition is live", the top story with its photo, the next few headlines, and "See all 10 on our latest post". Stories posted through the API can't carry link stickers, so it points people to the profile. If the Story fails, the carousel stays up.
+## How one edition is made
 
-Instagram allows at most **10 slides** in a carousel. That's why the main story goes on the cover rather than on a slide of its own.
+1. **Collect.** About 160 headlines from the last 12 hours come from 13 news feeds: The Hindu TN and Chennai, Times of India Chennai, and Google News searches for government, weather, sports, business, education, health, agriculture, plus a Tamil-language search.
+2. **Choose (Gemini, free tier).** Gemini picks 12 stories, ranked with government announcements and policies first, then weather, sports and other sectors. Stories that repeat the last few editions are set aside, and the best 10 are kept. Each story gets a short headline, a 2–3 sentence summary in Gemini's own words, a key fact, and the source. The link always comes from the news feed itself, never from the AI.
+3. **Read the full articles.** Google News links are resolved to the publisher's real article, and the article text is read: about 9 in 10 articles can be read in full. The text is only used inside the run and is never stored or published.
+4. **Choose photos (Pixabay, free licence).** Photos from news sites are copyrighted and never reposted.
+   - **Brief:** Gemini reads each full article and describes a generic scene that fits it, for example "stormy sea and dark clouds" for a cyclone warning. It also checks the slide summary and key fact against the article and corrects them if the article says otherwise.
+   - **Search:** Pixabay is searched inside a matching category. Photos tagged as fashion, glamour, portraits or people (unless the story is about people, like a match) are dropped.
+   - **Check:** Gemini looks at up to 4 candidate photos per story and picks one only if it is an honest illustration of the article. It rejects anything unrelated, misleading (such as a foreign landmark) or inappropriate. If none fits, the slide uses a designed colour background. A wrong photo is never used.
+5. **Draw.**
+   - **Carousel (1080×1350):** the cover carries the top story; slides 2–10 carry one story each, with category, headline, key fact, summary, source and photo credit.
+   - **Story (1080×1920):** "Edition is live", the top story, the next headlines, and "See all 10 on our latest post".
+6. **Post.**
+   - **Carousel:** posted with a caption giving the summary of the last 12 hours, the 10 headlines, "Full stories: link in bio", sources and hashtags.
+   - **Story:** posted next. If the Story fails, the carousel stays up.
+   - **Safety:** an edition is never posted twice, a publish that may have gone through is never repeated, and a scheduled run skips if an edition went out in the last 6 hours (for example after a manual post).
+7. **News page.** <https://nrutilotech.github.io/daily-tnnews> is rebuilt after every post. It shows each story with its summary and a **Read the full story** button linking to the original report, plus the previous week of editions.
 
----
+Free tiers cover everything: Gemini (about 3 calls per edition), Pixabay, GitHub Actions and GitHub Pages.
 
-## What you need (one-time setup, about 1 hour)
+## Settings
 
-### 1. The Instagram account
-1. Create the Instagram account **DAILY TNNEWS** in the Instagram app (username `dailytnnews`).
-2. Switch it to a **Professional account**: *Settings → Account type and tools → Switch to professional account → Business* (category: News & Media Website).
+**Secrets** (GitHub → Settings → Secrets and variables → Actions):
 
-### 2. Instagram API access (free)
-1. Go to <https://developers.facebook.com>, log in and click **Create App**. Choose the use case **"Manage messaging & content on Instagram"**, app type **Business**.
-2. In the app, open **Instagram → API setup with Instagram login**.
-3. Under *Generate access tokens*, click **Add account** and log in as the DAILY TNNEWS Instagram account.
-4. Copy the **Instagram user ID** (a number) → this is `IG_USER_ID`.
-5. Click **Generate token** and copy it → this is `IG_ACCESS_TOKEN` (valid for 60 days; the bot renews it automatically, see step 5).
-6. Make sure the `instagram_business_basic` and `instagram_business_content_publish` permissions are listed.
+| Secret | What it is |
+|---|---|
+| `GEMINI_API_KEY` | Google AI Studio key: <https://aistudio.google.com/apikey> |
+| `PIXABAY_API_KEY` | Pixabay key, shown under *Parameters → key* at <https://pixabay.com/api/docs/> once logged in |
+| `IG_USER_ID` | Instagram user ID (Meta app → Instagram → API setup with Instagram login) |
+| `IG_ACCESS_TOKEN` | Instagram token (same page, *Generate token*). Renewed automatically. |
+| `GH_PAT` | Fine-grained GitHub token for this repo with **Secrets: Read and write**. Lets the bot renew the Instagram token. Expires 24 Oct 2027, so make a new one before then. |
 
-Your own account can post without Meta's App Review, because you are the app's admin.
+**Variables** (optional, same page → *Variables*):
 
-### 3. API keys
-- **Gemini (free):** <https://aistudio.google.com/apikey> → sign in with Google → **Create API key** → `GEMINI_API_KEY`. The free tier covers this bot (2 posts a day). It works from the news-feed headlines; Google Search grounding is not free for new users, but you can set the `GEMINI_RESEARCH_MODEL` variable to a paid model to add it. Note: on the free tier Google may use requests to improve its products. That's fine here, because everything sent is public news.
-- **Pixabay (free):** sign up at <https://pixabay.com>, then open <https://pixabay.com/api/docs/>. Your key is shown under *Parameters → key* → `PIXABAY_API_KEY`. (Pexels stopped issuing new keys in 2026; an existing Pexels key also works as `PEXELS_API_KEY`.)
+| Variable | Example | What it does |
+|---|---|---|
+| `DRY_RUN` | `true` | Pause posting. Slides are still built and kept on the run page. |
+| `POST_STORY` | `false` | Stop posting the Story |
+| `NEWS_LANGUAGE` | `ta` | Tamil slides (default English) |
+| `INSTAGRAM_HANDLE` | `@dailytnnews` | Handle shown on the slides and page |
+| `GEMINI_WRITER_MODEL`, `GEMINI_BACKUP_MODELS` | `gemini-3.8-flash` | Which Gemini models to use, main first then backups |
+| `GEMINI_RESEARCH_MODEL` | (a paid model) | Adds a Google Search research pass. Not free for new users, so off by default. |
 
-### 4. Put the code on GitHub (free hosting and scheduler)
-1. Create a free account at <https://github.com> and a **new public repository** called `daily-tnnews`. It must be public, because Instagram downloads the slide images from it. Your keys stay private as secrets.
-2. Upload this folder. From a terminal in `D:\daily-tnnews`:
-   ```bash
-   git init -b main && git add . && git commit -m "DAILY TNNEWS bot"
-   ```
-   ```bash
-   git remote add origin https://github.com/YOUR-USERNAME/daily-tnnews.git && git push -u origin main
-   ```
-3. In the repository, go to **Settings → Secrets and variables → Actions** and add these **Secrets**:
+## Workflows
 
-   | Secret | Value |
-   |---|---|
-   | `GEMINI_API_KEY` | Gemini key |
-   | `PIXABAY_API_KEY` | Pixabay key |
-   | `IG_USER_ID` | Instagram user ID |
-   | `IG_ACCESS_TOKEN` | Instagram token |
-   | `GH_PAT` | a GitHub token, so the bot can renew the Instagram token (step 5) |
+| Workflow | When | What it does |
+|---|---|---|
+| **Post news** | 7 AM and 7 PM IST, or **Run workflow** (with *dry run* ticked it builds only) | Builds and posts the edition, hosts the slides on the `media` branch (latest post only), and saves `state/history.json` (avoids repeats) and `state/editions.json` (feeds the page) |
+| **Publish news page** | After every successful *Post news*, or a change to the page code | Rebuilds and publishes the GitHub Pages site. Pages source must be **GitHub Actions**. |
+| **Refresh Instagram token** | 1st and 15th of each month | Renews the 60-day Instagram token and saves it back as the secret |
 
-   Optional **Variables** (same page, *Variables* tab):
+If a run fails, GitHub emails you, and the next run 12 hours later tries again. The slides from every run are kept on its run page for 7 days.
 
-   | Variable | Example | What it does |
-   |---|---|---|
-   | `NEWS_LANGUAGE` | `ta` | Tamil slides (default `en` = English) |
-   | `INSTAGRAM_HANDLE` | `@dailytnnews` | Shown on the slides and in the caption |
-   | `DRY_RUN` | `true` | Pause posting; slides are still built so you can check them |
-   | `POST_STORY` | `false` | Stop posting the Story (default: on) |
+## Good to know
 
-### 5. Automatic token renewal
-Create a GitHub token at <https://github.com/settings/personal-access-tokens>: choose *Fine-grained*, *Only this repository*, permission **Secrets: Read and write**. Save it as the `GH_PAT` secret. The *Refresh Instagram token* workflow then renews the Instagram token on the 1st and 15th of every month.
+- **Gemini's free models are often busy.** Each model gets one quick retry, then a backup model takes over, so an edition takes about 1–6 minutes.
+- **Instagram doesn't let apps edit or delete a published post.** To fix a slide, use the Instagram app: post → ⋯ → Edit → remove the slide.
+- **Stories posted through the API can't have link stickers.** That's why the caption and Story point to the link in bio.
+- **The bio link** (`https://nrutilotech.github.io/daily-tnnews`) can only be added from the Instagram app: Edit profile → Links.
+- **AI can make mistakes.** Every slide names its source, and the page links to the original report. Use `DRY_RUN=true` whenever you want to check editions by hand first.
 
-### 6. Test before going live
-1. Open the **Actions** tab → **Post news** → **Run workflow**. Leave *dry run* ticked.
-2. When the run finishes, download **slides** from the bottom of the run page. Open `preview.html` and check the slides and caption.
-3. When you're happy, run it again with *dry run* unticked. The first real post goes up. After that it posts by itself at 7 AM and 7 PM every day.
-
----
-
-## Testing on your own computer
+## On your own computer
 ```bash
 npm install
 ```
 ```bash
 npm run sample
 ```
-`npm run sample` draws demo slides with placeholder text (no keys needed). Open `out/preview.html` to see them.
+`npm run sample` draws demo slides and a Story into `out/` (no keys needed). Open `out/preview.html` to see them. To build a real edition, copy `.env.example` to `.env`, add the keys, then run `npm run build`.
 
-To build a real edition locally, copy `.env.example` to `.env`, fill in the keys, then:
-```bash
-npm run build
-```
-
-## Changing things
-| What | Where |
+| To change | Edit |
 |---|---|
 | News sources | `FEEDS` in `src/config.js` |
-| What the AI prioritises, tone, language | `systemPrompt()` in `src/curate.js` |
-| Colours, fonts, layout | `src/render.js` |
-| Caption format | `buildCaption()` in `src/main.js` |
+| Editorial rules, tone, language | `systemPrompt()` in `src/curate.js` |
+| How photos are chosen | `src/images.js` |
+| Slide and Story design | `src/render.js` |
+| Caption | `buildCaption()` in `src/main.js` |
+| News page | `src/site.js` |
 | Posting times | the `cron` lines in `.github/workflows/post-news.yml` (UTC; IST = UTC + 5:30) |
-
-## Good practice for a news page
-- Read the first week of posts before trusting it fully. Gemini is told to use only facts it found in sources, but AI can still make mistakes. Use `DRY_RUN=true` any time you want to check posts by hand first.
-- Every slide names its source, and the caption says the photos are illustrative.
-- GitHub may start a scheduled run 5–20 minutes late at busy times. This is normal.
-- Gemini's free models are often busy. The bot gives each model a quick retry, then moves on to the backups (`gemini-3.6-flash`, `gemini-3.5-flash-lite`; change them with the `GEMINI_BACKUP_MODELS` variable).
-- The bot never posts the same edition twice. If a run is repeated, it skips the post. If Instagram times out while publishing, it stops rather than risking a double post, so check the page before re-running.
-- If a run fails, GitHub emails you and the next run 12 hours later tries again. The slides are kept on the run page for 7 days, even for failed runs.
+| Profile icon | `brand/make-profile.mjs` (Tamil Nadu outline from Natural Earth, public domain) |
 
 Fonts: Noto Sans and Noto Sans Tamil (SIL Open Font License, see `fonts/OFL.txt`).
