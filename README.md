@@ -3,7 +3,7 @@
 Every 12 hours (7 AM and 7 PM IST) this bot:
 
 1. **Collects** the last 12 hours of Tamil Nadu headlines from news feeds (The Hindu TN and Chennai, Times of India Chennai, and Google News searches for government, weather, sports, business, education, health, agriculture, plus a Tamil-language search).
-2. **Asks Claude** (Anthropic API, model `claude-opus-5-5`) to check the news with web search and pick the **top 10**. Government announcements and policies come first, then weather, sports and other sectors. Claude writes a short headline, a 2–3 sentence summary and a key fact for each story, in its own words, and names the source.
+2. **Asks Gemini** (Google's AI, free tier) to check the news with Google Search and pick the **top 10**. Government announcements and policies come first, then weather, sports and other sectors. Gemini writes a short headline, a 2–3 sentence summary and a key fact for each story, in its own words, and names the source.
 3. **Finds a photo** for each story on Pexels. Pexels photos are free to use, so no news-site photos are reposted.
 4. **Draws 10 slides** (1080×1350):
    - **Slide 1 (the cover):** the DAILY TNNEWS logo, the edition and date, the main story's photo and headline, "Last 12 hours · Top 10" and "Swipe →".
@@ -31,7 +31,7 @@ Instagram allows at most **10 slides** in a carousel. That's why the main story 
 Your own account can post without Meta's App Review, because you are the app's admin.
 
 ### 3. API keys
-- **Claude:** <https://platform.claude.com> → API keys → create a key → `ANTHROPIC_API_KEY`. Add some credit. Each edition costs roughly ₹20–50 (two Claude calls plus about 12 web searches), so about ₹1,200–3,000 a month for 60 posts.
+- **Gemini (free):** <https://aistudio.google.com/apikey> → sign in with Google → **Create API key** → `GEMINI_API_KEY`. The free tier covers this bot (2 posts a day). Research uses `gemini-2.5-flash`, the model whose Google Search is free (500 a day); slides are written with `gemini-3.8-flash`. If Google retires the older model, the bot falls back to the news-feed headlines; change the models with the `GEMINI_RESEARCH_MODEL` / `GEMINI_WRITER_MODEL` variables. Note: on the free tier Google may use requests to improve its products. That's fine here, because everything sent is public news.
 - **Pexels (free):** <https://www.pexels.com/api/> → get an API key → `PEXELS_API_KEY`.
 
 ### 4. Put the code on GitHub (free hosting and scheduler)
@@ -47,7 +47,7 @@ Your own account can post without Meta's App Review, because you are the app's a
 
    | Secret | Value |
    |---|---|
-   | `ANTHROPIC_API_KEY` | Claude key |
+   | `GEMINI_API_KEY` | Gemini key |
    | `PEXELS_API_KEY` | Pexels key |
    | `IG_USER_ID` | Instagram user ID |
    | `IG_ACCESS_TOKEN` | Instagram token |
@@ -89,13 +89,13 @@ npm run build
 | What | Where |
 |---|---|
 | News sources | `FEEDS` in `src/config.js` |
-| What Claude prioritises, tone, language | `systemPrompt()` in `src/curate.js` |
+| What the AI prioritises, tone, language | `systemPrompt()` in `src/curate.js` |
 | Colours, fonts, layout | `src/render.js` |
 | Caption format | `buildCaption()` in `src/main.js` |
 | Posting times | the `cron` lines in `.github/workflows/post-news.yml` (UTC; IST = UTC + 5:30) |
 
 ## Good practice for a news page
-- Read the first week of posts before trusting it fully. Claude is told to use only facts it found in sources, but AI can still make mistakes. Use `DRY_RUN=true` any time you want to check posts by hand first.
+- Read the first week of posts before trusting it fully. Gemini is told to use only facts it found in sources, but AI can still make mistakes. Use `DRY_RUN=true` any time you want to check posts by hand first.
 - Every slide names its source, and the caption says the photos are illustrative.
 - GitHub may start a scheduled run 5–20 minutes late at busy times. This is normal.
 

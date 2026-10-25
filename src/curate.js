@@ -1,11 +1,8 @@
-// Step 2: Claude researches the last 12 hours and picks the 10 most important stories.
-// Pass 1 uses web search to verify and fill gaps; pass 2 turns the brief into strict JSON.
-import Anthropic from "@anthropic-ai/sdk";
-import { betaZodOutputFormat } from "@anthropic-ai/sdk/helpers/beta/zod";
+// Step 2: Gemini researches the last 12 hours and picks the 10 most important stories.
+// Pass 1 uses Google Search grounding to verify and fill gaps; pass 2 turns the brief into strict JSON.
+// Both run on the Gemini API free tier (search grounding is free on gemini-2.5-flash, up to 500 a day).
 import { z } from "zod";
 import { config, CATEGORIES } from "./config.js";
-
-const FALLBACK = { betas: ["server-side-fallback-2026-07-01"], fallbacks: "default" };
 
 const Story = z.object({
   category: z.enum(CATEGORIES),
@@ -34,27 +31,29 @@ function systemPrompt() {
 Editorial rules:
 - Only include events reported in the last ${config.windowHours} hours that relate to Tamil Nadu (state, districts, Chennai, or national decisions that clearly affect TN).
 - Rank by public importance. Aim for a mix: government announcements and policies first, then weather, sports, business/industry, education, health, agriculture, transport and other sectors. Include a weather story if there is any forecast, alert or rain news. Avoid filling the list with politics or crime.
-- Every fact must come from a credible source you saw (the provided headlines or your web search). Never invent numbers, quotes or names. If something is unconfirmed, leave it out.
+- Every fact must come from a credible source you saw (the provided headlines or your search results). Never invent numbers, quotes or names. If something is unconfirmed, leave it out.
 - Write summaries in your own words; never copy sentences from articles.
 - Neutral tone, no opinions, no party bias, no sensational language. Do not name victims of crimes or minors.
 - Skip stories already covered in the previous posts listed, unless there is a genuinely new development (then say what is new).
 ${lang}`;
 }
 
-function extractText(content) {
-  return content.filter((b) => b.type === "text").map((b) => b.text).join("\n").trim();
-}
-
-function checkStop(resp, step) {
-  if (resp.stop_reason === "refusal") {
-    throw new Error(`Claude declined the ${step} step (${resp.stop_details?.category ?? "no category"})`);
-  }
-  if (resp.stop_reason === "max_tokens") throw new Error(`Claude ran out of output tokens in the ${step} step`);
+async function gemini(model, body) {
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-goog-api-key": config.geminiKey },
+    body: JSON.stringify({ systemInstruction: { parts: [{ text: systemPrompt() }] }, ...body }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(`Gemini ${model} ${res.status}: ${data.error?.message ?? "request failed"}`);
+  const cand = data.candidates?.[0];
+  const text = (cand?.content?.parts ?? []).map((p) => p.text ?? "").join("").trim();
+  if (!text) throw new Error(`Gemini ${model} returned no text (${cand?.finishReason ?? data.promptFeedback?.blockReason ?? "unknown"})`);
+  return text;
 }
 
 export async function curate(headlines, history) {
-  if (!config.anthropicKey) throw new Error("ANTHROPIC_API_KEY is not set");
-  const client = new Anthropic({ apiKey: config.anthropicKey });
+  if (!config.geminiKey) throw new Error("GEMINI_API_KEY is not set");
 
   const now = new Date().toLocaleString("en-IN", { timeZone: config.timezone, dateStyle: "full", timeStyle: "short" });
   const list = headlines
@@ -62,69 +61,53 @@ export async function curate(headlines, history) {
     .join("\n");
   const previous = history.flatMap((p) => p.headlines).slice(-40);
 
-  const userMsg = {
-    role: "user",
-    content: `It is now ${now} (IST). Prepare the Tamil Nadu news brief for the last ${config.windowHours} hours.
+  const task = `It is now ${now} (IST). Prepare the Tamil Nadu news brief for the last ${config.windowHours} hours.
 
 Headlines collected from news feeds:
-${list || "(feeds returned nothing — rely on web search)"}
+${list || "(feeds returned nothing)"}
 
 Already posted in previous editions (avoid repeating):
 ${previous.map((h) => "- " + h).join("\n") || "(none)"}
 
-Use web search to confirm the important stories and to find anything missing — especially Tamil Nadu government orders/schemes/announcements, the Chennai Regional Meteorological Centre / IMD weather outlook, and sports. Then write a brief of the 10 best stories, most important first. For each give: category, the key facts (who/what/when/where, numbers), the source publisher and URL, and a stock-photo idea.`,
-  };
+Pick the 10 best stories, most important first. For each give: category, the key facts (who/what/when/where, numbers), the source publisher and URL, and a stock-photo idea.`;
 
-  // Pass 1 — research with web search. Server tools can pause long turns; resume them.
-  console.log("  Claude: researching…");
-  const tools = [
-    {
-      type: "web_search_20260209",
-      name: "web_search",
-      max_uses: 12,
-      user_location: { type: "approximate", city: "Chennai", region: "Tamil Nadu", country: "IN", timezone: config.timezone },
-    },
-  ];
-  let assistantContent = [];
-  let resp;
-  for (let i = 0; i < 5; i++) {
-    const messages = assistantContent.length ? [userMsg, { role: "assistant", content: assistantContent }] : [userMsg];
-    resp = await client.beta.messages.create({
-      model: config.model,
-      max_tokens: 16000,
-      thinking: { type: "adaptive" },
-      output_config: { effort: "medium" },
-      system: systemPrompt(),
-      tools,
-      messages,
-      ...FALLBACK,
+  // Pass 1 — research. Google Search grounding is free only on the older Flash model, so try that first
+  // and fall back to working from the feed headlines alone if it is unavailable or over its limit.
+  let brief;
+  try {
+    console.log(`  Gemini (${config.researchModel} + Google Search): researching…`);
+    brief = await gemini(config.researchModel, {
+      contents: [{ role: "user", parts: [{ text: task + "\n\nUse Google Search to confirm the important stories and to find anything missing — especially Tamil Nadu government orders/schemes/announcements, the Chennai Regional Meteorological Centre / IMD weather outlook, and sports." }] }],
+      tools: [{ google_search: {} }],
     });
-    checkStop(resp, "research");
-    assistantContent = [...assistantContent, ...resp.content];
-    if (resp.stop_reason !== "pause_turn") break;
+  } catch (e) {
+    console.warn(`  search research failed (${e.message}); using feed headlines only`);
+    brief = await gemini(config.writerModel, { contents: [{ role: "user", parts: [{ text: task }] }] });
   }
-  const brief = extractText(assistantContent);
-  if (!brief) throw new Error("Claude returned an empty research brief");
 
-  // Pass 2 — structure the brief into slides.
-  console.log("  Claude: writing slides…");
-  const parsed = await client.beta.messages.parse({
-    model: config.model,
-    max_tokens: 16000,
-    thinking: { type: "adaptive" },
-    output_config: { effort: "low", format: betaZodOutputFormat(Edition) },
-    system: systemPrompt(),
-    messages: [
+  // Pass 2 — structure the brief into slides (JSON output, checked with zod).
+  console.log(`  Gemini (${config.writerModel}): writing slides…`);
+  const schema = z.toJSONSchema(Edition);
+  delete schema.$schema;
+  const request = {
+    contents: [
       {
         role: "user",
-        content: `Here is today's research brief:\n\n${brief}\n\nTurn it into exactly ${config.storyCount} slide stories (most important first) following the editorial rules and the field limits.`,
+        parts: [{ text: `Here is today's research brief:\n\n${brief}\n\nTurn it into exactly ${config.storyCount} slide stories (most important first) following the editorial rules and the field limits.` }],
       },
     ],
-    ...FALLBACK,
-  });
-  checkStop(parsed, "writing");
-  const edition = parsed.parsed_output;
-  if (!edition) throw new Error("Could not parse Claude's structured output");
+    generationConfig: { responseMimeType: "application/json", responseJsonSchema: schema },
+  };
+  let raw;
+  try {
+    raw = await gemini(config.writerModel, request);
+  } catch (e) {
+    console.warn(`  ${e.message}; retrying with ${config.researchModel}`);
+    raw = await gemini(config.researchModel, request);
+  }
+  const parsed = Edition.safeParse(JSON.parse(raw.replace(/^```(?:json)?\s*|\s*```$/g, "")));
+  if (!parsed.success) throw new Error(`Gemini's slide JSON did not match the expected format: ${parsed.error.message.slice(0, 300)}`);
+  const edition = parsed.data;
   if (edition.stories.length < 5) throw new Error(`Only ${edition.stories.length} stories came back — not posting a thin edition`);
   edition.stories = edition.stories.slice(0, config.storyCount);
   edition.hashtags = [...new Set(edition.hashtags.map((h) => h.replace(/^#/, "").replace(/\s+/g, "")))].slice(0, 15);

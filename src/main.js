@@ -1,5 +1,5 @@
 // DAILY TNNEWS — Tamil Nadu news carousel bot.
-//   node src/main.js build    collect → Claude → photos → slides + caption in out/
+//   node src/main.js build    collect → Gemini → photos → slides + caption in out/
 //   node src/main.js post     publish out/ to Instagram (needs MEDIA_BASE_URL hosting the slides)
 //   node src/main.js sample   render demo slides with dummy text (no API keys needed, never postable)
 //   node src/main.js refresh-token   print a refreshed 60-day Instagram token
@@ -82,7 +82,7 @@ async function build() {
   console.log("1/4 Collecting headlines…");
   const headlines = await collectHeadlines();
   console.log(`  ${headlines.length} candidate headlines`);
-  console.log("2/4 Choosing the top stories with Claude…");
+  console.log("2/4 Choosing the top stories with Gemini…");
   const edition = await curate(headlines, readHistory());
   edition.stories.forEach((s, i) => console.log(`  ${i + 1}. [${s.category}] ${s.headline}`));
   console.log("3/4 Finding photos…");

@@ -16,7 +16,7 @@ export const SAMPLE_EDITION = {
   stories: [
     s("Government", "State announces a new welfare scheme for rural households", "Placeholder summary text showing how two or three short sentences look on the cover slide. Real posts use facts from news sources.", "Placeholder key fact"),
     s("Weather", "Heavy rain alert for coastal districts over the next two days", "Placeholder summary text that wraps across a few lines so the layout can be checked for spacing and readability on a phone.", "Orange alert · 2 days"),
-    s("Sports", "Chennai side wins a close league match at home", "Placeholder summary text for a sports story. It keeps to the same length limits as the real stories Claude writes.", ""),
+    s("Sports", "Chennai side wins a close league match at home", "Placeholder summary text for a sports story. It keeps to the same length limits as the real stories the AI writes.", ""),
     s("Business", "New electronics plant planned near the city with thousands of jobs", "Placeholder summary text for a business story with an investment figure and a timeline mentioned here.", "₹1,000 crore · 5,000 jobs"),
     s("Education", "Board exam timetable released for higher secondary students", "Placeholder summary text for an education story about dates and what students need to do next.", "Exams from March"),
     s("Health", "District hospitals to get new emergency care units", "Placeholder summary text for a health story describing where the units come up and when they open.", ""),

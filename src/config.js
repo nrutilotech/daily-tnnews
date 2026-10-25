@@ -26,8 +26,10 @@ export const config = {
   windowHours: Number(env("WINDOW_HOURS", "12")),
   storyCount: 10, // Instagram carousels allow at most 10 slides: cover (story 1) + 9 more
 
-  model: env("CLAUDE_MODEL", "claude-opus-5-5"),
-  anthropicKey: env("ANTHROPIC_API_KEY"),
+  // Gemini API (free tier). Google Search grounding is free only on gemini-2.5-flash.
+  geminiKey: env("GEMINI_API_KEY"),
+  researchModel: env("GEMINI_RESEARCH_MODEL", "gemini-2.5-flash"),
+  writerModel: env("GEMINI_WRITER_MODEL", "gemini-3.8-flash"),
   pexelsKey: env("PEXELS_API_KEY"),
 
   igUserId: env("IG_USER_ID"),
