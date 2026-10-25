@@ -50,6 +50,8 @@ export const config = {
   threadsToken: env("THREADS_ACCESS_TOKEN"),
   threadsUserId: env("THREADS_USER_ID"),
   threadsHost: env("THREADS_HOST", "graph.threads.net"),
+  // short address of the news page, as used in the Instagram bio
+  pageShortUrl: env("PAGE_SHORT_URL", "https://tinyurl.com/dailytnnews"),
   // the "link in bio" news page (GitHub Pages)
   pageUrl:
     env("PAGE_URL") ||

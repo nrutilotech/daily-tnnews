@@ -71,7 +71,7 @@ export async function threadsUserId() {
 }
 
 // The post text (exported for tests).
-export function threadText(p, { pageUrl = config.pageUrl } = {}) {
+export function threadText(p, { pageUrl = config.pageShortUrl || config.pageUrl } = {}) {
   return fitText(
     [
       `📰 ${config.brand} | ${p.dateLabel} · ${p.editionLabel}`,
