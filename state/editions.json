@@ -1,1 +1,104 @@
-[]
+[
+  {
+    "id": "2026102515",
+    "editionLabel": "Evening Edition",
+    "dateLabel": "25 October 2026",
+    "postedAt": "2026-10-25T15:15:03.276Z",
+    "permalink": "https://www.instagram.com/p/De7AXJ0lBaA/",
+    "summary": "Tamil Nadu mourns the passing of veteran chef K. Damodaran, known widely as Chef Damu, while authorities step up monsoon alerts as a depression over the Bay of Bengal triggers heavy rains and cyclone warnings across coastal districts. Meanwhile, the state government has issued orders for 50,000 new agricultural power connections and announced a major housing scheme.",
+    "files": [
+      "01.jpg",
+      "02.jpg",
+      "03.jpg",
+      "04.jpg",
+      "05.jpg",
+      "06.jpg",
+      "07.jpg",
+      "08.jpg",
+      "09.jpg",
+      "10.jpg"
+    ],
+    "stories": [
+      {
+        "category": "Health",
+        "headline": "Celebrity Chef Damu Passes Away at 72",
+        "summary": "Padma Shri awardee and beloved television culinary judge K. Damodaran has passed away in Chennai at the age of 72 following health complications. Chief Minister Vijay and other leaders offered deep condolences.",
+        "key_fact": "Set cooking world record in 2010",
+        "source_name": "The Hindu – Tamil Nadu",
+        "source_url": "https://www.thehindu.com/news/national/tamil-nadu/chef-damu-passes-away-the-age-of-72-in-chennai/article71623061.ece"
+      },
+      {
+        "category": "Weather",
+        "headline": "Cyclone Warning: Nine TN Ports on Alert",
+        "summary": "As a depression over the Bay of Bengal intensifies, authorities have hoisted distant cautionary signal number 1 at nine ports across Tamil Nadu and Puducherry. Fishermen have been strictly advised to stay off the sea.",
+        "key_fact": "System likely to cross Andhra coast",
+        "source_name": "DT Next",
+        "source_url": "https://www.dtnext.in/news/tamilnadu/cyclone-warning-no-1-signal-hoisted-at-9-ports-in-tamil-nadu-and-puducherry"
+      },
+      {
+        "category": "Government",
+        "headline": "TN Government Clears 50,000 Free Power Links",
+        "summary": "The Tamil Nadu government has issued an official order to provide 50,000 new free agricultural electricity connections, with the state bearing an additional financial commitment of Rs 127 crore.",
+        "key_fact": "Over 3 lakh farmers still waiting",
+        "source_name": "NewsBytes Tamil",
+        "source_url": "https://tamil.newsbytesapp.com/news/india/tamil-nadu-govt-issues-go-to-provide-50000-free-farm-power-connections-at-rs-750-crore/story"
+      },
+      {
+        "category": "Government",
+        "headline": "Housing Push: 12,648 New Homes Announced",
+        "summary": "The Tamil Nadu government has announced a major housing initiative to construct 12,648 new residential units across various districts to benefit urban and rural families, allocating substantial funds for the project.",
+        "key_fact": "Estimated outlay of Rs 2,882 crore",
+        "source_name": "Makkal Kural",
+        "source_url": "https://makkalkural.net/%E0%AE%B0%E0%AF%82-2882-%E0%AE%95%E0%AF%8B%E0%AE%9F%E0%AE%BF%E0%AE%AF%E0%AE%BF%E0%AE%B2%E0%AF%8D-12648-%E0%AE%B5%E0%AF%80%E0%AE%9F%E0%AF%81%E0%AE%95%E0%AE%B3%E0%AF%8D-%E0%AE%95%E0%AE%9F%E0%AF%8D/"
+      },
+      {
+        "category": "Law & Order",
+        "headline": "Ex-Army Captain Arrested for Espionage",
+        "summary": "Tamil Nadu Police have arrested a retired Army captain near Vellore for allegedly leaking confidential military intelligence to a foreign operative via messaging applications over the past year.",
+        "key_fact": "Contacted by agent via WhatsApp",
+        "source_name": "The Hindu – Tamil Nadu",
+        "source_url": "https://www.thehindu.com/news/national/tamil-nadu/ex-army-captain-arrested-in-vellore-over-military-intelligence-leak/article71623053.ece"
+      },
+      {
+        "category": "Law & Order",
+        "headline": "Chennai Police Issue LOC in Gem Granites Case",
+        "summary": "Chennai Police have issued Look Out Circulars restraining five suspects, linked to the Gem Granites Veeramani POCSO case, from leaving the country as investigations into multiple abuse charges continue.",
+        "key_fact": "Involves multiple POCSO Act cases",
+        "source_name": "The Hindu – Tamil Nadu",
+        "source_url": "https://www.thehindu.com/news/national/tamil-nadu/gem-granites-veeramani-case-chennai-police-issue-loc-restraining-five-suspects-from-leaving-india/article71623500.ece"
+      },
+      {
+        "category": "Environment",
+        "headline": "CPI Launches Campaign Against New Secretariat",
+        "summary": "The Communist Party of India has launched a signature campaign opposing the state government's proposed new Secretariat building project at Pattinapakkam, citing environmental and local fishermen concerns.",
+        "key_fact": "Launched by M. Veerapandian",
+        "source_name": "The Hindu – Tamil Nadu",
+        "source_url": "https://www.thehindu.com/news/national/tamil-nadu/cpi-launches-signature-campaign-against-tamil-nadus-new-secretariat-project-at-pattinapakkam/article71622978.ece"
+      },
+      {
+        "category": "Transport",
+        "headline": "MTC Wins National Urban Transport Award",
+        "summary": "The Metropolitan Transport Corporation has bagged a prestigious national award recognizing its innovative approaches and efficiency in urban transport financing and fleet management.",
+        "key_fact": "Awarded for transport financing",
+        "source_name": "DT Next",
+        "source_url": "https://www.dtnext.in/news/tamilnadu/mtc-wins-national-award-for-urban-transport-financing"
+      },
+      {
+        "category": "Sports",
+        "headline": "TN Eyeing Second Successive Win at Home",
+        "summary": "Tamil Nadu’s cricket team under head coach Yo Mahesh is geared up to face Railways in the Ranji Trophy match, aiming for a strong performance despite looming weather disruptions.",
+        "key_fact": "Match hosted in Chennai",
+        "source_name": "Sportstar",
+        "source_url": "https://sportstar.thehindu.com/cricket/domestic/yo-mahesh-tamil-nadu-head-coach-home-win-railways-chepauk-stadium-ranji-trophy/article71623056.ece"
+      },
+      {
+        "category": "Technology",
+        "headline": "Madras University Plans Portal Security Upgrade",
+        "summary": "Following multiple cyber intrusions over the past few months, the University of Madras has initiated comprehensive plans to upgrade its web portals and strengthen digital security frameworks.",
+        "key_fact": "Faced four cyberattacks recently",
+        "source_name": "Times of India – Chennai",
+        "source_url": "https://timesofindia.indiatimes.com/city/chennai/university-of-madras-plans-portal-upgrade-after-four-cyberattacks-in-six-months/articleshow/135191332.cms"
+      }
+    ]
+  }
+]
