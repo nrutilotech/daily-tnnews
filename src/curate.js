@@ -42,12 +42,16 @@ ${lang}`;
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const TEMPORARY = / (429|500|502|503|504):/;
 
+// models whose free daily allowance ran out: skipped for the rest of the run (no point waiting)
+const usedUp = new Set();
+
 // The free-tier models are often busy (503) or rate-limited (429). Each model gets a couple of quick
 // tries, then the next model in the list takes over; a timeout or a bad answer moves on at once.
 // `check` turns the raw text into the result and throws if it is unusable.
 async function gemini(body, check, models) {
   let lastError;
   for (const [n, m] of models.entries()) {
+    if (usedUp.has(m)) continue;
     const attempts = n === models.length - 1 ? 3 : 2;
     for (let attempt = 1; attempt <= attempts; attempt++) {
       try {
@@ -56,6 +60,11 @@ async function gemini(body, check, models) {
         return result;
       } catch (e) {
         lastError = e;
+        if (e.daily) {
+          usedUp.add(m);
+          console.warn(`  ${m}: free daily limit reached — using the next model for the rest of this run`);
+          break;
+        }
         if (!TEMPORARY.test(e.message) || attempt === attempts) {
           console.warn(`  ${m}: ${e.message.slice(0, 140)} — trying the next model`);
           break;
@@ -65,7 +74,7 @@ async function gemini(body, check, models) {
       }
     }
   }
-  throw lastError;
+  throw lastError ?? new Error("every Gemini model has reached its free daily limit");
 }
 
 // The same retry/backup behaviour for other steps (photo briefs, the photo check).
@@ -83,7 +92,12 @@ async function geminiOnce(model, body) {
     throw new Error(e.name === "TimeoutError" ? `Gemini ${model} timed out after 120s` : `Gemini ${model}: ${e.message}`);
   });
   const data = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(`Gemini ${model} ${res.status}: ${data.error?.message ?? "request failed"}`);
+  if (!res.ok) {
+    const err = new Error(`Gemini ${model} ${res.status}: ${data.error?.message ?? "request failed"}`);
+    // a per-day quota (as opposed to a per-minute one) won't come back until tomorrow
+    err.daily = res.status === 429 && /PerDay/i.test(JSON.stringify(data.error?.details ?? []));
+    throw err;
+  }
   const cand = data.candidates?.[0];
   const text = (cand?.content?.parts ?? []).map((p) => p.text ?? "").join("").trim();
   if (!text) throw new Error(`Gemini ${model} returned no text (${cand?.finishReason ?? data.promptFeedback?.blockReason ?? "unknown"})`);

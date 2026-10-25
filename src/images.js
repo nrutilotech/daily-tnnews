@@ -153,14 +153,36 @@ async function download(url, ms = 30000) {
 }
 
 // 3. Gemini looks at every candidate and picks the one that fits each article (or none).
+// Small backup models sometimes skip stories in a long request, so the skipped ones are asked again
+// in small groups.
 async function pickPhotos(stories, briefs, cands) {
+  const picks = stories.map((_, i) => (cands[i].length ? null : { photo: 0, reason: "no candidate photos found" }));
+  const waiting = () => picks.flatMap((p, i) => (p ? [] : [i]));
+  for (const p of await askPicks(stories, briefs, cands, waiting())) picks[p.index] = p;
+  const again = waiting();
+  if (again.length) {
+    console.log(`  ${again.length} stor${again.length === 1 ? "y was" : "ies were"} skipped — asking again for those`);
+    for (let k = 0; k < again.length; k += 3) {
+      try {
+        for (const p of await askPicks(stories, briefs, cands, again.slice(k, k + 3))) picks[p.index] = p;
+      } catch (e) {
+        console.warn(`  second photo check failed (${e.message.slice(0, 120)})`);
+      }
+    }
+  }
+  return picks.map((p) => p ?? { photo: 0, reason: "not answered" });
+}
+
+// One photo-check request for the stories at the given indexes. Returns [{ index, photo, reason }].
+async function askPicks(stories, briefs, cands, indexes) {
+  if (!indexes.length) return [];
   const parts = [
     {
       text: `You are choosing illustrative stock photos for news slides. These are NOT photos of the actual event and do not need to show the exact place: a photo fits if it is a reasonable, honest illustration of the story's theme (any stormy sea for a cyclone warning, any onions for onion prices, a generic campus for a university story). The news is from Tamil Nadu, India, so a photo must look like it could plausibly be there. For each story pick the best fitting photo, or 0 if none is a reasonable illustration. For stories about political statements, criticism or party campaigns a stock photo rarely fits: choose 0 unless a photo clearly illustrates the topic (for example a gavel for a court ruling). Reject a photo (never pick it) if it: is unrelated to the theme; shows snow, ice or alpine mountains; shows European, American or East Asian streets, buildings, markets, trains, vehicles or landscapes that look clearly foreign; shows people when people are not allowed; is sexual, glamour or fashion-like; shows a recognisable foreign landmark, flag, signage or text that would mislead; or looks like a real photo of a specific different event (an accident, a protest, a ceremony).`,
     },
   ];
-  for (const [i, s] of stories.entries()) {
-    if (!cands[i].length) continue;
+  for (const i of indexes) {
+    const s = stories[i];
     parts.push({ text: `\n### Story ${i + 1}: ${s.headline}\nPhoto should show: ${briefs[i]?.subject ?? s.headline}\nPeople allowed: ${briefs[i]?.people_ok ? "yes" : "no"}` });
     for (const [k, c] of cands[i].entries()) {
       parts.push({ text: `Story ${i + 1}, photo ${k + 1}:` });
@@ -175,7 +197,10 @@ async function pickPhotos(stories, briefs, cands) {
     },
     json(Pick),
   );
-  return stories.map((_, i) => result.picks.find((p) => p.story === i + 1) ?? { photo: 0, reason: "not answered" });
+  return indexes.flatMap((i) => {
+    const p = result.picks.find((x) => x.story === i + 1);
+    return p ? [{ index: i, photo: p.photo, reason: p.reason }] : [];
+  });
 }
 
 export async function findPhotos(stories) {

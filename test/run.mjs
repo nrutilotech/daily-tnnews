@@ -134,6 +134,42 @@ await test("photo step: if the photo check fails, no unchecked photo is used", a
   assert.deepEqual(photos, [null]);
 });
 
+await test("photo step: stories the check skipped are asked about again", async () => {
+  const asked = [];
+  handler = (url, opts) => {
+    if (url.includes("generativelanguage")) {
+      const parts = JSON.parse(opts.body).contents[0].parts;
+      if (parts.some((p) => p.inline_data)) {
+        const nums = parts.map((p) => p.text?.match(/^\n### Story (\d+)/)?.[1]).filter(Boolean).map(Number);
+        asked.push(nums);
+        // the first answer covers story 1 only (as a small backup model did); the second covers the rest
+        return gem({ picks: (asked.length === 1 ? [1] : nums).map((story) => ({ story, photo: 1, reason: "fits" })) });
+      }
+      return gem({ briefs: [1, 2, 3, 4].map((story) => ({ story, subject: "office", queries: ["office building"], people_ok: false, summary: "s", key_fact: "" })) });
+    }
+    if (url.startsWith("https://pixabay.com/api/")) return ok({ hits: [{ id: Math.random(), type: "photo", tags: "office", webformatURL: "https://img/x", largeImageURL: "https://img/xL", user: "c", imageWidth: 1, imageHeight: 1 }] });
+    return new Response(new Uint8Array([1]), { status: 200 });
+  };
+  const stories = SAMPLE_EDITION.stories.slice(0, 4).map((s) => ({ ...s, article_text: "x".repeat(400) }));
+  const photos = await quiet(() => findPhotos(stories));
+  assert.deepEqual(asked, [[1, 2, 3, 4], [2, 3, 4]]);
+  assert.ok(photos.every(Boolean));
+});
+
+// (after the other Gemini tests: a used-up model stays skipped for the rest of the process)
+await test("a model out of its daily quota is skipped at once, and for the rest of the run", async () => {
+  const calls = [];
+  const daily = { message: "You exceeded your current quota", details: [{ violations: [{ quotaId: "GenerateRequestsPerDayPerProjectPerModel-FreeTier" }] }] };
+  handler = (url) => {
+    const model = url.match(/models\/([^:]+)/)[1];
+    calls.push(model);
+    return model === "gemini-3.8-flash" ? fail(429, daily) : gem(editionJson());
+  };
+  await quiet(() => curate(headlines, []));
+  await quiet(() => curate(headlines, []));
+  assert.deepEqual(calls, ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.6-flash"]);
+});
+
 const igHandler = (scenario, log) => (url, opts) => {
   const body = opts.body ? Object.fromEntries(new URLSearchParams(opts.body)) : {};
   if (url.includes("media_publish")) {
