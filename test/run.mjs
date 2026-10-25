@@ -156,6 +156,51 @@ await test("photo step: stories the check skipped are asked about again", async 
   assert.ok(photos.every(Boolean));
 });
 
+await test("the report's own photo is found (og:image), skipping logos", async () => {
+  const { extractImage } = await import("../src/article.js");
+  assert.equal(extractImage(`<meta content="/img/story.jpg" property="og:image">`, "https://news.example/a/1"), "https://news.example/img/story.jpg");
+  assert.equal(extractImage(`<meta property="og:image" content="https://cdn.example/site-logo.png">`, "https://news.example/a/1"), null);
+  assert.equal(extractImage(`<p>no image</p>`, "https://news.example/a/1"), null);
+});
+
+await test("photo step: no stock photo fits → the report's photo, credited; never for crime stories", async () => {
+  const { createCanvas } = await import("@napi-rs/canvas");
+  // a "photo" (varied colours) and a "logo card" (one flat colour)
+  const png = (w, h, flat = false) => {
+    const cv = createCanvas(w, h);
+    const ctx = cv.getContext("2d");
+    for (let x = 0; x < w; x += 40) for (let y = 0; y < h; y += 40) {
+      ctx.fillStyle = flat ? "#d02000" : `rgb(${(x * 7) % 256},${(y * 5) % 256},${(x + y) % 256})`;
+      ctx.fillRect(x, y, 40, 40);
+    }
+    return cv.toBuffer("image/png");
+  };
+  handler = (url, opts) => {
+    if (url.includes("generativelanguage")) {
+      const parts = JSON.parse(opts.body).contents[0].parts;
+      if (parts.some((p) => p.inline_data)) return gem({ picks: [1, 2, 3, 4, 5, 6].map((story) => ({ story, photo: 0, reason: "nothing fits" })) });
+      return gem({ briefs: [1, 2, 3, 4, 5, 6].map((story) => ({ story, subject: "office", queries: ["office"], people_ok: false, summary: "s", key_fact: "" })) });
+    }
+    if (url.startsWith("https://pixabay.com/api/")) return ok({ hits: [{ id: Math.random(), type: "photo", tags: "office", webformatURL: "https://img/x", largeImageURL: "https://img/xL", user: "c", imageWidth: 1, imageHeight: 1 }] });
+    if (/news\.example\/(photo|crime|shared)/.test(url)) return new Response(png(1200, 675), { status: 200 });
+    if (url === "https://news.example/tiny.jpg") return new Response(png(200, 200), { status: 200 });
+    if (url === "https://news.example/logo-card.jpg") return new Response(png(1200, 630, true), { status: 200 });
+    return new Response(new Uint8Array([1]), { status: 200 });
+  };
+  const base = SAMPLE_EDITION.stories[0];
+  const stories = [
+    { ...base, category: "Weather", source_name: "The Hindu – Tamil Nadu", source_image: "https://news.example/photo.jpg" },
+    { ...base, category: "Law & Order", source_name: "DT Next", source_image: "https://news.example/crime.jpg" },
+    { ...base, category: "Health", source_name: "DT Next", source_image: "https://news.example/tiny.jpg" },
+    { ...base, category: "Sports", source_name: "TOI", source_image: "https://news.example/logo-card.jpg" },
+    { ...base, category: "Business", source_name: "TOI", source_image: "https://news.example/shared.jpg" },
+    { ...base, category: "Transport", source_name: "TOI", source_image: "https://news.example/shared.jpg" },
+  ];
+  const photos = await quiet(() => findPhotos(stories));
+  assert.equal(photos[0]?.credit, "Photo: The Hindu");
+  assert.deepEqual(photos.slice(1), [null, null, null, null, null], "crime, tiny, logo card and a shared default image are all skipped");
+});
+
 // (after the other Gemini tests: a used-up model stays skipped for the rest of the process)
 await test("a model out of its daily quota is skipped at once, and for the rest of the run", async () => {
   const calls = [];

@@ -1,13 +1,20 @@
 // Step 3: choose a photo for each story only after reading the full article, and only if it fits.
 //   1. Gemini reads each full article and describes what a fitting photo should show (+ search terms).
 //      In the same pass it checks the slide text against the article and corrects it if needed.
-//   2. Pixabay (free licence; news-site photos are copyrighted and never reposted) returns candidates,
+//   2. Pixabay (free licence, so always tried first) returns candidates,
 //      searched inside a matching category, with people/fashion photos filtered out by their tags.
 //   3. Gemini looks at the candidate photos next to the article brief and picks one only if it really
-//      matches. If none does — or the check can't run — the slide uses the designed background.
+//      matches.
+//   4. If no stock photo fits (or the check can't run), the news report's own photo is used, credited
+//      to the publisher on the slide (SOURCE_PHOTOS=false turns this off). Crime stories never use the
+//      report's photo (it could show victims or minors); with nothing usable, the slide uses the
+//      designed background.
 import { z } from "zod";
+import { createCanvas, loadImage } from "@napi-rs/canvas";
 import { config } from "./config.js";
 import { askGemini } from "./curate.js";
+
+const NO_SOURCE_PHOTO = new Set(["Law & Order"]);
 
 const CATEGORY_FALLBACK_QUERY = {
   Government: "government office building",
@@ -146,8 +153,8 @@ async function candidates(story, brief, used) {
   return found;
 }
 
-async function download(url, ms = 30000) {
-  const res = await fetch(url, { signal: AbortSignal.timeout(ms) });
+async function download(url, ms = 30000, headers = {}) {
+  const res = await fetch(url, { headers, signal: AbortSignal.timeout(ms) });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);
   return Buffer.from(await res.arrayBuffer());
 }
@@ -203,9 +210,50 @@ async function askPicks(stories, briefs, cands, indexes) {
   });
 }
 
-export async function findPhotos(stories) {
-  if (!config.pixabayKey) return stories.map(() => null);
+// A logo card or plain graphic (e.g. a site's "no photo" image) rather than a photo: one flat colour
+// covers most of it.
+function looksLikeGraphic(img) {
+  const ctx = createCanvas(32, 32).getContext("2d");
+  ctx.drawImage(img, 0, 0, 32, 32);
+  const d = ctx.getImageData(0, 0, 32, 32).data;
+  const counts = new Map();
+  for (let i = 0; i < d.length; i += 4) {
+    const key = `${d[i] >> 4},${d[i + 1] >> 4},${d[i + 2] >> 4}`;
+    counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return Math.max(...counts.values()) / 1024 > 0.5;
+}
 
+// The photo from the news report itself, credited to the publisher (step 4).
+async function sourcePhoto(story) {
+  if (!config.sourcePhotos || !story.source_image || NO_SOURCE_PHOTO.has(story.category)) return null;
+  try {
+    const buffer = await download(story.source_image, 20000, { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130 Safari/537.36" });
+    const img = await loadImage(buffer);
+    // too small to fill a slide, a banner/strip rather than a photo, or a logo card
+    if (img.width < 600 || img.height < 320 || img.width / img.height > 2.4 || img.height / img.width > 1.8) return null;
+    if (looksLikeGraphic(img)) return null;
+    const publisher = String(story.source_name ?? "").replace(/\s+[–-]\s+.*$/, "").trim() || new URL(story.source_url).hostname.replace(/^www\./, "");
+    return { buffer, credit: `Photo: ${publisher}` };
+  } catch {
+    return null;
+  }
+}
+
+export async function findPhotos(stories) {
+  const photos = config.pixabayKey ? await stockPhotos(stories) : stories.map(() => null);
+  // the same image on two different reports is a site's default picture, not a news photo
+  const seen = stories.map((s) => s.source_image).filter(Boolean);
+  const isDefault = (u) => seen.filter((x) => x === u).length > 1;
+  for (const [i, s] of stories.entries()) {
+    if (photos[i]) continue;
+    photos[i] = isDefault(s.source_image) ? null : await sourcePhoto(s);
+    console.log(`  story ${i + 1}: ${photos[i] ? `the report's own photo (${photos[i].credit})` : "designed background"}`);
+  }
+  return photos;
+}
+
+async function stockPhotos(stories) {
   let briefs;
   try {
     console.log("  reading the full articles to brief the photos…");
@@ -221,7 +269,7 @@ export async function findPhotos(stories) {
       if (typeof b.key_fact === "string" && b.key_fact.trim() !== (s.key_fact ?? "").trim()) s.key_fact = b.key_fact.trim();
     }
   } catch (e) {
-    console.warn(`  could not brief the photos (${e.message.slice(0, 120)}) — using designed backgrounds`);
+    console.warn(`  could not brief the photos (${e.message.slice(0, 120)}) — no stock photos this time`);
     return stories.map(() => null);
   }
 
@@ -245,7 +293,7 @@ export async function findPhotos(stories) {
     console.log("  checking candidate photos against each article…");
     picks = await pickPhotos(stories, briefs, cands);
   } catch (e) {
-    console.warn(`  photo check failed (${e.message.slice(0, 120)}) — using designed backgrounds`);
+    console.warn(`  photo check failed (${e.message.slice(0, 120)}) — no stock photos this time`);
     return stories.map(() => null);
   }
 
@@ -253,7 +301,7 @@ export async function findPhotos(stories) {
   for (const [i, pick] of picks.entries()) {
     const c = cands[i][pick.photo - 1];
     if (!c) {
-      console.log(`  story ${i + 1}: no photo fits (${pick.reason}) — designed background`);
+      console.log(`  story ${i + 1}: no stock photo fits (${pick.reason})`);
       photos.push(null);
       continue;
     }

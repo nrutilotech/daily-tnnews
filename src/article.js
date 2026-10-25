@@ -69,7 +69,25 @@ function extractText(html) {
   return clean(html.match(/<meta[^>]+(?:property="og:description"|name="description")[^>]+content="([^"]*)"/i)?.[1] ?? "");
 }
 
-// Returns { url, text }: the publisher URL (when it could be resolved) and up to MAX_CHARS of article text.
+// The report's own lead photo (og:image / twitter:image) as an absolute URL; site logos and
+// placeholders are skipped.
+const NOT_A_PHOTO = /logo|favicon|placeholder|sprite|spacer|blank|no[-_]?image|default[-_]?(?:image|img|thumb|og)/i;
+export function extractImage(html, pageUrl) {
+  const meta = (key) =>
+    html.match(new RegExp(`<meta[^>]+(?:property|name)=["']${key}["'][^>]*content=["']([^"']+)["']`, "i"))?.[1] ??
+    html.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]*(?:property|name)=["']${key}["']`, "i"))?.[1];
+  const raw = meta("og:image:secure_url") ?? meta("og:image") ?? meta("twitter:image") ?? meta("twitter:image:src");
+  if (!raw) return null;
+  try {
+    const url = new URL(decodeEntities(raw).trim(), pageUrl).href;
+    return /^https?:\/\//.test(url) && !NOT_A_PHOTO.test(url) ? url : null;
+  } catch {
+    return null;
+  }
+}
+
+// Returns { url, text, image }: the publisher URL (when it could be resolved), up to MAX_CHARS of
+// article text, and the report's lead photo (null if none).
 export async function readArticle(link) {
   let url = link;
   try {
@@ -77,9 +95,12 @@ export async function readArticle(link) {
     const res = await fetch(url, { headers: UA, redirect: "follow", signal: AbortSignal.timeout(20000) });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const html = (await res.text()).slice(0, 3_000_000);
-    return { url: res.url || url, text: extractText(html).slice(0, MAX_CHARS) };
+    const finalUrl = res.url || url;
+    // a Google News page (link not resolved) only has Google's own image
+    const image = /news\.google\.com/.test(finalUrl) ? null : extractImage(html, finalUrl);
+    return { url: finalUrl, text: extractText(html).slice(0, MAX_CHARS), image };
   } catch (e) {
-    return { url, text: "", error: e.message };
+    return { url, text: "", image: null, error: e.message };
   }
 }
 
@@ -91,7 +112,7 @@ export async function readArticles(links) {
     Array.from({ length: 4 }, async () => {
       while (next < links.length) {
         const i = next++;
-        out[i] = links[i] ? await readArticle(links[i]) : { url: null, text: "" };
+        out[i] = links[i] ? await readArticle(links[i]) : { url: null, text: "", image: null };
       }
     }),
   );

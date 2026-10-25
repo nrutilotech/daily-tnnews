@@ -140,7 +140,7 @@ export async function buildSite(mediaBaseUrl = config.mediaBaseUrl) {
 ${latestHtml}
 ${olderHtml}
 </main>
-<footer>Summaries are written with AI from public news reports. Tap “Read the full story” for the original report. Photos on the slides are illustrative.${updated ? `<br>Last updated: ${esc(updated)}.` : ""}</footer>
+<footer>Summaries are written with AI from public news reports. Tap “Read the full story” for the original report. Stock photos on the slides are illustrative; news photos are credited to their publishers.${updated ? `<br>Last updated: ${esc(updated)}.` : ""}</footer>
 </body>
 </html>
 `;

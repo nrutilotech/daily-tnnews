@@ -29,6 +29,15 @@ function editionMeta(date = new Date()) {
   };
 }
 
+// Credits for the photos used: news photos by publisher; stock photos are only illustrations.
+function photoNote(edition) {
+  const credits = edition.stories.map((s) => s.photo_credit).filter(Boolean);
+  const stock = credits.some((c) => /Pixabay/.test(c));
+  const news = [...new Set(credits.filter((c) => !/Pixabay/.test(c)).map((c) => c.replace(/^Photo:\s*/, "")))];
+  if (news.length) return `Photos: ${news.join(", ")} (credited on each slide)${stock ? "; Pixabay stock photos are illustrative" : ""}.`;
+  return stock ? "Photos are illustrative (Pixabay)." : "";
+}
+
 function buildCaption(edition, meta) {
   const lines = [
     `📰 ${config.brand} | ${meta.dateLabel} · ${meta.editionLabel}`,
@@ -46,7 +55,7 @@ function buildCaption(edition, meta) {
     `🔗 Full stories with links to the original reports: link in bio.`,
     `🔔 Follow ${config.handle} for Tamil Nadu news every morning & evening.`,
     "",
-    `Sources: ${[...new Set(edition.stories.map((s) => s.source_name))].join(", ")}. Photos are illustrative.`,
+    `Sources: ${[...new Set(edition.stories.map((s) => s.source_name))].join(", ")}. ${photoNote(edition)}`.trim(),
     "",
     edition.hashtags.map((h) => "#" + h).join(" "),
   ];
@@ -108,6 +117,7 @@ async function build() {
   articles.forEach((a, i) => {
     const s = edition.stories[i];
     s.article_text = a.text;
+    s.source_image = a.image;
     // link straight to the publisher's article instead of the Google News redirect
     if (a.url && /^https?:\/\//.test(a.url) && !/news\.google\.com/.test(a.url)) s.source_url = a.url;
   });
@@ -119,7 +129,11 @@ async function build() {
   console.log("4/5 Choosing photos that fit each article…");
   const photos = await findPhotos(edition.stories);
   // the article text is only used here; it is the publisher's text, so it isn't kept or published
-  edition.stories.forEach((s) => delete s.article_text);
+  edition.stories.forEach((s, i) => {
+    delete s.article_text;
+    delete s.source_image;
+    if (photos[i]) s.photo_credit = photos[i].credit;
+  });
   console.log("5/5 Drawing slides…");
   const slides = await renderSlides(edition, photos, meta);
   const story = await renderStory(edition, photos, meta);

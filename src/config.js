@@ -58,6 +58,9 @@ export const config = {
     (process.env.GITHUB_REPOSITORY
       ? `https://${process.env.GITHUB_REPOSITORY.split("/")[0]}.github.io/${process.env.GITHUB_REPOSITORY.split("/")[1]}/`
       : "https://nrutilotech.github.io/daily-tnnews/"),
+  // when no stock photo fits, use the news report's own photo, credited to the publisher
+  // (set SOURCE_PHOTOS=false to use the designed background instead)
+  sourcePhotos: !/^(0|false|no)$/i.test(env("SOURCE_PHOTOS", "true")),
   // also post an Instagram Story announcing each edition (set POST_STORY=false to turn off)
   postStory: !/^(0|false|no)$/i.test(env("POST_STORY", "true")),
 

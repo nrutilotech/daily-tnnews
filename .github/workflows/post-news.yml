@@ -45,6 +45,7 @@ jobs:
         env:
           GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           PIXABAY_API_KEY: ${{ secrets.PIXABAY_API_KEY }}
+          SOURCE_PHOTOS: ${{ vars.SOURCE_PHOTOS || 'true' }}
 
       - name: Keep a copy of the slides on the run page
         if: always()
