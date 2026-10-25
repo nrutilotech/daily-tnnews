@@ -198,8 +198,9 @@ export function shortUrl(url) {
 }
 
 // "🔗 dtnext.in/news/…" line (a drawn link icon, since emoji fonts aren't available).
-function sourceLink(ctx, url, x, y, maxW, color, size = 23, light = false) {
-  const text = shortUrl(url);
+// Prefers the short link (e.g. "Full story: v.gd/KaHm0Y"); otherwise the article's own address.
+function sourceLink(ctx, story, x, y, maxW, color, size = 23, light = false) {
+  const text = story.short_url ? `Full story: ${story.short_url.replace(/^https?:\/\//, "")}` : shortUrl(story.source_url);
   if (!text) return;
   // link icon: two small rounded links
   ctx.save();
@@ -278,7 +279,7 @@ async function cover(story, photo, meta) {
   // source + link on the left, photo credit on the right
   ctx.font = font("regular", 20);
   const creditW = photo?.credit ? ctx.measureText(photo.credit).width + 30 : 0;
-  sourceLink(ctx, story.source_url, PAD, 1212, maxW - creditW, C.yellow, 21, true);
+  sourceLink(ctx, story, PAD, 1212, maxW - creditW, C.yellow, 22, true);
   credit(ctx, photo?.credit, W - PAD, 1212);
 
   // footer strip
@@ -383,7 +384,7 @@ async function storySlide(story, photo, index, meta) {
   ctx.font = font("semi", 25);
   ctx.fillStyle = C.ink;
   ctx.fillText(ellipsize(ctx, [`Source: ${story.source_name}`], 1, maxW - numW)[0], PAD, footerY + 48);
-  sourceLink(ctx, story.source_url, PAD, footerY + 90, maxW, color);
+  sourceLink(ctx, story, PAD, footerY + 90, maxW, color, story.short_url ? 26 : 23);
 
   return cv.encode("jpeg", 90);
 }

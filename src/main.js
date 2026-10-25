@@ -11,6 +11,7 @@ import { collectHeadlines } from "./collect.js";
 import { curate } from "./curate.js";
 import { findPhotos } from "./images.js";
 import { readArticles } from "./article.js";
+import { shortenAll } from "./shorten.js";
 import { renderSlides, renderStory } from "./render.js";
 import { publishCarousel, publishStory, refreshToken } from "./instagram.js";
 import { SAMPLE_EDITION } from "./sample.js";
@@ -34,7 +35,7 @@ function buildCaption(edition, meta) {
     `🕛 Tamil Nadu in the last ${config.windowHours} hours:`,
     edition.edition_summary,
     "",
-    ...edition.stories.map((s, i) => `${NUM[i]} ${s.caption_line}`),
+    ...edition.stories.map((s, i) => `${NUM[i]} ${s.caption_line}${s.short_url ? ` → ${s.short_url.replace(/^https?:\/\//, "")}` : ""}`),
     "",
     `👉 Swipe through all ${edition.stories.length} slides for the details.`,
     `🔗 Full stories with links to the original reports: link in bio.`,
@@ -106,6 +107,10 @@ async function build() {
     if (a.url && /^https?:\/\//.test(a.url) && !/news\.google\.com/.test(a.url)) s.source_url = a.url;
   });
   console.log(`  read ${articles.filter((a) => a.text.length >= 300).length} of ${articles.length} full articles`);
+  // short, typeable links for the slides (the news page keeps the full links)
+  const shortLinks = await shortenAll(edition.stories.map((s) => s.source_url));
+  shortLinks.forEach((u, i) => u && (edition.stories[i].short_url = u));
+  console.log(`  shortened ${shortLinks.filter(Boolean).length} of ${shortLinks.length} links`);
   console.log("4/5 Choosing photos that fit each article…");
   const photos = await findPhotos(edition.stories);
   // the article text is only used here; it is the publisher's text, so it isn't kept or published

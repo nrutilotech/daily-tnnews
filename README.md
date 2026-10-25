@@ -11,14 +11,15 @@ Every 12 hours (7 AM and 7 PM IST) the bot posts a 10-slide carousel and a Story
    - **Brief:** Gemini reads each full article and describes a generic scene that fits it, for example "stormy sea and dark clouds" for a cyclone warning. It also checks the slide summary and key fact against the article and corrects them if the article says otherwise.
    - **Search:** Pixabay is searched inside a matching category. Photos tagged as fashion, glamour, portraits or people (unless the story is about people, like a match) are dropped.
    - **Check:** Gemini looks at up to 4 candidate photos per story and picks one only if it is an honest illustration of the article. It rejects anything unrelated, misleading (such as a foreign landmark) or inappropriate. If none fits, the slide uses a designed colour background. A wrong photo is never used.
-5. **Draw.**
-   - **Carousel (1080×1350):** the cover carries the top story; slides 2–10 carry one story each, with category, headline, key fact, summary, source and photo credit.
+5. **Short links.** Each article gets a short, easy-to-type link like `v.gd/tnnzc3fh`, from v.gd, with is.gd and TinyURL as backups; all free with no account. The codes avoid look-alike characters. If every service fails, the slide shows the article's own address. Instagram never makes links in images or captions tappable, so these are for typing; the tappable links are on the news page in the bio.
+6. **Draw.**
+   - **Carousel (1080×1350):** the cover carries the top story; slides 2–10 carry one story each, with category, headline, key fact, summary, source, short link and photo credit.
    - **Story (1080×1920):** "Edition is live", the top story, the next headlines, and "See all 10 on our latest post".
-6. **Post.**
+7. **Post.**
    - **Carousel:** posted with a caption giving the summary of the last 12 hours, the 10 headlines, "Full stories: link in bio", sources and hashtags.
    - **Story:** posted next. If the Story fails, the carousel stays up.
    - **Safety:** an edition is never posted twice, a publish that may have gone through is never repeated, and a scheduled run skips if an edition went out in the last 6 hours (for example after a manual post).
-7. **News page.** <https://nrutilotech.github.io/daily-tnnews> is rebuilt after every post. It shows each story with its summary and a **Read the full story** button linking to the original report, plus the previous week of editions.
+8. **News page.** <https://nrutilotech.github.io/daily-tnnews> is rebuilt after every post. It shows each story with its summary and a **Read the full story** button linking to the original report, plus the previous week of editions.
 
 Free tiers cover everything: Gemini (about 3 calls per edition), Pixabay, GitHub Actions and GitHub Pages.
 

@@ -191,6 +191,32 @@ await test("slides and Story render (English and Tamil)", async () => {
   assert.equal(story[0], 0xff); // JPEG
 });
 
+await test("short links: readable code from v.gd; falls back to the next service, then to none", async () => {
+  const { shortenAll } = await import("../src/shorten.js");
+  let calls = [];
+  handler = (url) => {
+    calls.push(new URL(url).hostname);
+    const c = new URL(url).searchParams.get("shorturl");
+    if (url.includes("v.gd")) return new Response(`https://v.gd/${c}`, { status: 200 });
+    return new Response("Error", { status: 500 });
+  };
+  const [one] = await shortenAll(["https://example.com/a"]);
+  assert.match(one, /^https:\/\/v\.gd\/tnn[a-hjkmnp-z2-9]{5}$/);
+  calls = [];
+  handler = (url) => {
+    calls.push(new URL(url).hostname);
+    if (url.includes("tinyurl")) return new Response("https://tinyurl.com/abc123", { status: 200 });
+    throw new TypeError("fetch failed");
+  };
+  const [two] = await shortenAll(["https://example.com/b"]);
+  assert.equal(two, "https://tinyurl.com/abc123");
+  handler = () => {
+    throw new TypeError("fetch failed");
+  };
+  const [three] = await quiet(() => shortenAll(["https://example.com/c"]));
+  assert.equal(three, null);
+});
+
 await test("workflow files are in place", async () => {
   for (const f of ["post-news.yml", "news-page.yml", "refresh-token.yml"]) assert.ok(fs.existsSync(new URL(`../.github/workflows/${f}`, import.meta.url)), f);
   const post = fs.readFileSync(new URL("../.github/workflows/post-news.yml", import.meta.url), "utf8");
