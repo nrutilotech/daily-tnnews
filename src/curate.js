@@ -48,10 +48,12 @@ async function gemini(model, body) {
   for (const m of models) {
     for (let attempt = 1; attempt <= 4; attempt++) {
       try {
-        return await geminiOnce(m, body);
+        const text = await geminiOnce(m, body);
+        if (m !== model) console.log(`  (answered by backup model ${m})`);
+        return text;
       } catch (e) {
         lastError = e;
-        if (!/ (429|500|502|503|504):/.test(e.message)) break; // not a temporary error: try the next model
+        if (!/ (429|500|502|503|504):|timed out/.test(e.message)) break; // not a temporary error: try the next model
         if (attempt < 4) {
           console.warn(`  ${e.message.slice(0, 120)} — retrying in ${attempt * 20}s`);
           await sleep(attempt * 20000);
@@ -68,6 +70,9 @@ async function geminiOnce(model, body) {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-goog-api-key": config.geminiKey },
     body: JSON.stringify({ systemInstruction: { parts: [{ text: systemPrompt() }] }, ...body }),
+    signal: AbortSignal.timeout(150000),
+  }).catch((e) => {
+    throw new Error(e.name === "TimeoutError" ? `Gemini ${model} timed out after 150s` : `Gemini ${model}: ${e.message}`);
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(`Gemini ${model} ${res.status}: ${data.error?.message ?? "request failed"}`);
