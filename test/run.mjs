@@ -338,6 +338,21 @@ await test("Threads: one post only (slides + text), no replies or comments", asy
   assert.equal(r.permalink, "https://www.threads.net/@dailytnnews/post/x");
 });
 
+await test('Threads: "resource does not exist" at publish waits and publishes once', async () => {
+  const log = [];
+  handler = (url, opts) => {
+    if ((opts.method ?? "GET") === "GET") return ok({ status: "FINISHED" });
+    if (url.endsWith("/threads_publish")) {
+      log.push("publish");
+      return log.length === 1 ? fail(400, { message: "The requested resource does not exist", code: 24 }) : ok({ id: "P1" });
+    }
+    return ok({ id: "C1" });
+  };
+  const { postEditionToThreads } = await import("../src/threads.js");
+  await quiet(() => postEditionToThreads(threadsEdition, ["https://img/1", "https://img/2"]));
+  assert.deepEqual(log, ["publish", "publish"]);
+});
+
 await test("Threads: if the images fail, the text is posted on its own", async () => {
   const log = [];
   handler = (url, opts) => {

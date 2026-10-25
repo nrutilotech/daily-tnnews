@@ -1,0 +1,51 @@
+name: Post the latest edition on Threads
+
+# Use this if a "Post news" run reached Instagram but its Threads post failed: it posts the same
+# slides and summary on Threads. An edition that is already on Threads is never posted again.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# never at the same time as a "Post news" run
+concurrency:
+  group: post-news
+  cancel-in-progress: false
+
+jobs:
+  threads:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      BRAND_NAME: ${{ vars.BRAND_NAME || 'DAILY TNNEWS' }}
+      INSTAGRAM_HANDLE: ${{ vars.INSTAGRAM_HANDLE || '@dailytnnews' }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Post on Threads
+        run: node src/main.js threads
+        env:
+          MEDIA_BASE_URL: https://raw.githubusercontent.com/${{ github.repository }}/media
+          THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
+          THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
+
+      - name: Remember it was posted
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add state/history.json
+          git diff --cached --quiet && exit 0
+          git commit -qm "history: posted on Threads"
+          for i in 1 2 3; do
+            git pull -q --rebase origin main && git push -q && exit 0
+            sleep 5
+          done
+          echo "::warning::Could not save state/history.json"

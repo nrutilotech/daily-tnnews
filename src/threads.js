@@ -59,9 +59,21 @@ async function create(uid, params, label) {
 }
 
 async function publish(uid, creationId) {
-  // never repeat a publish that may have gone through (no double posts)
-  const { id } = await call("POST", `${uid}/threads_publish`, { creation_id: creationId }, 4, true);
-  return id;
+  // Meta advises waiting about 30 s after a container is ready before publishing it; publishing
+  // straight away can fail with "The requested resource does not exist".
+  await sleep(30000);
+  for (let attempt = 1; ; attempt++) {
+    try {
+      // never repeat a publish that may have gone through (no double posts)
+      const { id } = await call("POST", `${uid}/threads_publish`, { creation_id: creationId }, 4, true);
+      return id;
+    } catch (e) {
+      // "does not exist" = Threads hasn't finished with the container yet, so nothing was published
+      if (attempt >= 4 || !/does not exist/i.test(e.message)) throw e;
+      console.log(`  Threads isn't ready to publish yet — trying again in ${attempt * 20}s`);
+      await sleep(attempt * 20000);
+    }
+  }
 }
 
 export async function threadsUserId() {

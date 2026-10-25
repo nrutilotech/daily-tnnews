@@ -15,7 +15,7 @@ import { shortenAll } from "./shorten.js";
 import { renderSlides, renderStory } from "./render.js";
 import { publishCarousel, publishStory, refreshToken, whoAmI as instagramWhoAmI } from "./instagram.js";
 import { SAMPLE_EDITION } from "./sample.js";
-import { buildSite, saveEdition } from "./site.js";
+import { buildSite, readEditions, saveEdition } from "./site.js";
 import { postEditionToThreads, refreshThreadsToken, whoAmI as threadsWhoAmI } from "./threads.js";
 
 const NUM = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"];
@@ -283,9 +283,29 @@ async function check() {
   if (!ok) throw new Error("a connection check failed");
 }
 
-const run = { build, post, sample, site, check, "refresh-token": refresh, "refresh-threads-token": refreshThreads }[cmd];
+// Puts the latest Instagram edition on Threads when the run's own Threads post failed
+// ("Post the latest edition on Threads" workflow). Never posts an edition to Threads twice.
+async function threads() {
+  const history = readHistory();
+  const entry = history[history.length - 1];
+  const e = readEditions().find((x) => x.id === entry?.id);
+  if (!entry || !e) return console.log("No posted edition to share on Threads.");
+  if (entry.threads) return console.log(`Edition ${e.id} is already on Threads: ${entry.threads}`);
+  if (!config.mediaBaseUrl) throw new Error("MEDIA_BASE_URL is not set");
+  const urls = e.files.map((f) => `${config.mediaBaseUrl}/${e.id}/${f}`);
+  // the media branch only holds the latest posted slides
+  const r = await fetch(urls[0], { method: "HEAD", signal: AbortSignal.timeout(15000) }).catch(() => null);
+  if (!r?.ok) throw new Error(`The slides for ${e.id} are no longer hosted — wait for the next edition`);
+  console.log(`Posting edition ${e.id} on Threads…`);
+  const t = await postEditionToThreads({ id: e.id, dateLabel: e.dateLabel, editionLabel: e.editionLabel, edition: { edition_summary: e.summary, stories: e.stories } }, urls);
+  entry.threads = t.permalink ?? true;
+  fs.writeFileSync(config.stateFile, JSON.stringify(history, null, 2));
+  console.log(`Threads: posted ${t.permalink ?? ""}`);
+}
+
+const run = { build, post, sample, site, check, threads, "refresh-token": refresh, "refresh-threads-token": refreshThreads }[cmd];
 if (!run) {
-  console.log("Usage: node src/main.js build | post | sample | site | check | refresh-token | refresh-threads-token");
+  console.log("Usage: node src/main.js build | post | sample | site | check | threads | refresh-token | refresh-threads-token");
   process.exit(1);
 }
 run()
