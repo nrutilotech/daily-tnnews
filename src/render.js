@@ -187,6 +187,42 @@ function credit(ctx, text, x, y, align = "right") {
   ctx.textAlign = "left";
 }
 
+// The source article's address, readable: no "https://www.", cut with "…" to fit.
+export function shortUrl(url) {
+  try {
+    const u = new URL(url);
+    return (u.hostname.replace(/^www\./, "") + decodeURIComponent(u.pathname).replace(/\/$/, "")).replace(/\s+/g, "-");
+  } catch {
+    return "";
+  }
+}
+
+// "🔗 dtnext.in/news/…" line (a drawn link icon, since emoji fonts aren't available).
+function sourceLink(ctx, url, x, y, maxW, color, size = 23, light = false) {
+  const text = shortUrl(url);
+  if (!text) return;
+  // link icon: two small rounded links
+  ctx.save();
+  ctx.strokeStyle = light ? "rgba(255,255,255,0.85)" : color;
+  ctx.lineWidth = 3;
+  ctx.translate(x + 11, y - size * 0.36);
+  ctx.rotate(-Math.PI / 4);
+  for (const dx of [-5, 5]) {
+    roundRect(ctx, dx - 7, -4.5, 14, 9, 4.5);
+    ctx.stroke();
+  }
+  ctx.restore();
+  ctx.font = font("semi", size);
+  ctx.fillStyle = light ? "rgba(255,255,255,0.85)" : color;
+  const avail = maxW - 32;
+  let t = text;
+  if (ctx.measureText(t).width > avail) {
+    while (t.length > 8 && ctx.measureText(t + "…").width > avail) t = t.slice(0, -1);
+    t += "…";
+  }
+  ctx.fillText(t, x + 32, y);
+}
+
 async function cover(story, photo, meta) {
   const cv = createCanvas(W, H);
   const ctx = cv.getContext("2d");
@@ -227,7 +263,7 @@ async function cover(story, photo, meta) {
   const sumSize = sumFit.size;
   const headH = head.lines.length * head.size * 1.14;
   const sumH = sum.length * sumSize * 1.4;
-  let y = 1190 - (50 + 34 + headH + 24 + sumH);
+  let y = 1176 - (50 + 34 + headH + 24 + sumH);
 
   chip(ctx, `Top story · ${story.category}`, PAD, y, color);
   y += 50 + 34;
@@ -239,6 +275,10 @@ async function cover(story, photo, meta) {
   ctx.font = font("regular", sumSize);
   drawLines(ctx, sum, PAD, y + sumSize * 0.95, sumSize, 1.4);
 
+  // source + link on the left, photo credit on the right
+  ctx.font = font("regular", 20);
+  const creditW = photo?.credit ? ctx.measureText(photo.credit).width + 30 : 0;
+  sourceLink(ctx, story.source_url, PAD, 1212, maxW - creditW, C.yellow, 21, true);
   credit(ctx, photo?.credit, W - PAD, 1212);
 
   // footer strip
@@ -305,7 +345,7 @@ async function storySlide(story, photo, index, meta) {
   y = drawLines(ctx, head.lines, PAD, y + head.size, head.size, 1.16) - head.size * 0.16;
 
   if (story.key_fact) {
-    y += 30;
+    y += 22;
     ctx.fillStyle = color;
     ctx.fillRect(PAD, y, 8, 44);
     ctx.font = font("semi", 30);
@@ -315,14 +355,14 @@ async function storySlide(story, photo, index, meta) {
   }
 
   // summary fills the space left above the footer
-  y += 30;
-  const footerY = 1262;
+  y += 22;
+  const footerY = 1226;
   const lh = 1.4;
   let sumSize = 32;
   let sum;
-  for (const size of [32, 30, 28, 26]) {
+  for (const size of [32, 30, 28, 26, 24]) {
     sumSize = size;
-    const room = Math.max(1, Math.floor((footerY - 24 - y) / (size * lh)));
+    const room = Math.max(1, Math.floor((footerY - 16 - y) / (size * lh)));
     ctx.font = font("regular", size);
     const lines = wrapLines(ctx, story.summary, maxW);
     sum = ellipsize(ctx, lines, Math.min(room, 6), maxW);
@@ -331,22 +371,19 @@ async function storySlide(story, photo, index, meta) {
   ctx.fillStyle = C.gray;
   drawLines(ctx, sum, PAD, y + sumSize, sumSize, lh);
 
-  // footer
+  // footer: source name + its link, slide number
   ctx.fillStyle = C.line;
   ctx.fillRect(PAD, footerY, maxW, 2);
-  ctx.font = font("semi", 24);
-  ctx.fillStyle = C.gray;
-  const src = ellipsize(ctx, [`Source: ${story.source_name}`], 1, 410)[0];
-  ctx.fillText(src, PAD, footerY + 52);
   ctx.textAlign = "right";
   ctx.font = font("bold", 26);
   ctx.fillStyle = C.ink;
-  ctx.fillText(`${index + 1} / ${meta.total}`, W - PAD, footerY + 52);
-  ctx.font = font("semi", 22);
-  ctx.fillStyle = C.gray;
-  ctx.textAlign = "center";
-  ctx.fillText(config.handle, W / 2 + 40, footerY + 52);
+  ctx.fillText(`${index + 1} / ${meta.total}`, W - PAD, footerY + 48);
+  const numW = ctx.measureText(`${index + 1} / ${meta.total}`).width + 30;
   ctx.textAlign = "left";
+  ctx.font = font("semi", 25);
+  ctx.fillStyle = C.ink;
+  ctx.fillText(ellipsize(ctx, [`Source: ${story.source_name}`], 1, maxW - numW)[0], PAD, footerY + 48);
+  sourceLink(ctx, story.source_url, PAD, footerY + 90, maxW, color);
 
   return cv.encode("jpeg", 90);
 }
