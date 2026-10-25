@@ -276,6 +276,11 @@ await test("workflow files are in place", async () => {
   for (const f of ["post-news.yml", "news-page.yml", "refresh-token.yml"]) assert.ok(fs.existsSync(new URL(`../.github/workflows/${f}`, import.meta.url)), f);
   const post = fs.readFileSync(new URL("../.github/workflows/post-news.yml", import.meta.url), "utf8");
   assert.ok(!/\$\{\{\s*github\.token\s*\}\}@/.test(post), "token must not be inlined in a URL");
+  // the bot must never comment or reply on posts
+  for (const f of fs.readdirSync(new URL("../src/", import.meta.url))) {
+    const code = fs.readFileSync(new URL(`../src/${f}`, import.meta.url), "utf8");
+    assert.ok(!/reply_to_id|\/comments|\/replies|comment_id/.test(code), `no comment/reply code in ${f}`);
+  }
 });
 
 for (const [status, name] of results) console.log(`${status === "ok" ? "✓" : "✗"} ${name}`);
