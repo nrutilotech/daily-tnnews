@@ -7,8 +7,8 @@ import { config, CATEGORIES } from "./config.js";
 const Story = z.object({
   category: z.enum(CATEGORIES),
   headline: z.string().describe("Punchy slide headline, max ~70 characters, no clickbait"),
-  summary: z.string().describe("2–3 short factual sentences, max ~230 characters, original wording"),
-  key_fact: z.string().describe("One figure/date/place that matters most, max ~40 characters, or empty string"),
+  summary: z.string().describe("2–3 short factual sentences, max ~200 characters, original wording; add detail beyond the headline"),
+  key_fact: z.string().describe("One extra figure/date/place NOT already in the headline (e.g. 'Red alert: Madurai, Theni'), max ~40 characters; empty string if nothing new to add"),
   caption_line: z.string().describe("One-line version for the Instagram caption list, max ~90 characters"),
   source_name: z.string().describe("Publisher the facts come from, e.g. The Hindu"),
   source_url: z.string(),

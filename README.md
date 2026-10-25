@@ -17,7 +17,7 @@ Instagram allows at most **10 slides** in a carousel. That's why the main story 
 ## What you need (one-time setup, about 1 hour)
 
 ### 1. The Instagram account
-1. Create the Instagram account **DAILY TNNEWS** in the Instagram app (for example, username `daily.tnnews`).
+1. Create the Instagram account **DAILY TNNEWS** in the Instagram app (username `dailytnnews`).
 2. Switch it to a **Professional account**: *Settings → Account type and tools → Switch to professional account → Business* (category: News & Media Website).
 
 ### 2. Instagram API access (free)
@@ -58,7 +58,7 @@ Your own account can post without Meta's App Review, because you are the app's a
    | Variable | Example | What it does |
    |---|---|---|
    | `NEWS_LANGUAGE` | `ta` | Tamil slides (default `en` = English) |
-   | `INSTAGRAM_HANDLE` | `@daily.tnnews` | Shown on the slides and in the caption |
+   | `INSTAGRAM_HANDLE` | `@dailytnnews` | Shown on the slides and in the caption |
    | `DRY_RUN` | `true` | Pause posting; slides are still built so you can check them |
 
 ### 5. Automatic token renewal

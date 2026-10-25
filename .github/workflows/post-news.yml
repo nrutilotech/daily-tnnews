@@ -25,7 +25,7 @@ jobs:
     env:
       DRY_RUN: ${{ (inputs.dry_run || vars.DRY_RUN == 'true') && 'true' || 'false' }}
       BRAND_NAME: ${{ vars.BRAND_NAME || 'DAILY TNNEWS' }}
-      INSTAGRAM_HANDLE: ${{ vars.INSTAGRAM_HANDLE || '@daily.tnnews' }}
+      INSTAGRAM_HANDLE: ${{ vars.INSTAGRAM_HANDLE || '@dailytnnews' }}
       NEWS_LANGUAGE: ${{ vars.NEWS_LANGUAGE || 'en' }}
     steps:
       - uses: actions/checkout@v4

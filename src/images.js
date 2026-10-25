@@ -26,7 +26,7 @@ async function searchPixabay(query, used) {
   if (!res.ok) throw new Error(`Pixabay ${res.status}`);
   const data = await res.json();
   // prefer portrait photos, but take any orientation if that's all there is
-  const hits = (data.hits ?? []).filter((h) => !used.has("pb" + h.id));
+  const hits = (data.hits ?? []).filter((h) => h.type === "photo" && !used.has("pb" + h.id));
   const p = hits.find((h) => h.imageHeight >= h.imageWidth) ?? hits[0];
   return p && { id: "pb" + p.id, url: p.largeImageURL, credit: `Photo: ${p.user} / Pixabay` };
 }

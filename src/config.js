@@ -19,7 +19,7 @@ const env = (k, d = "") => (process.env[k] ?? d).trim();
 
 export const config = {
   brand: env("BRAND_NAME", "DAILY TNNEWS"),
-  handle: env("INSTAGRAM_HANDLE", "@daily.tnnews"),
+  handle: env("INSTAGRAM_HANDLE", "@dailytnnews"),
   // "en" = English slides, "ta" = Tamil slides (caption headlines follow the same language)
   language: env("NEWS_LANGUAGE", "en"),
   timezone: "Asia/Kolkata",

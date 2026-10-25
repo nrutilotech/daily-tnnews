@@ -222,10 +222,11 @@ async function cover(story, photo, meta) {
   // bottom-anchored text block
   const maxW = W - PAD * 2;
   const head = fitText(ctx, story.headline, "bold", [80, 74, 68, 62, 56], maxW, 4);
-  ctx.font = font("regular", 33);
-  const sum = ellipsize(ctx, wrapLines(ctx, story.summary, maxW), 3, maxW);
+  const sumFit = fitText(ctx, story.summary, "regular", [33, 31, 29, 27], maxW, head.lines.length > 3 ? 3 : 4);
+  const sum = sumFit.lines;
+  const sumSize = sumFit.size;
   const headH = head.lines.length * head.size * 1.14;
-  const sumH = sum.length * 33 * 1.4;
+  const sumH = sum.length * sumSize * 1.4;
   let y = 1190 - (50 + 34 + headH + 24 + sumH);
 
   chip(ctx, `Top story · ${story.category}`, PAD, y, color);
@@ -235,8 +236,8 @@ async function cover(story, photo, meta) {
   drawLines(ctx, head.lines, PAD, y + head.size * 0.92, head.size, 1.14);
   y += headH + 24;
   ctx.fillStyle = "rgba(255,255,255,0.86)";
-  ctx.font = font("regular", 33);
-  drawLines(ctx, sum, PAD, y + 33 * 0.95, 33, 1.4);
+  ctx.font = font("regular", sumSize);
+  drawLines(ctx, sum, PAD, y + sumSize * 0.95, sumSize, 1.4);
 
   credit(ctx, photo?.credit, W - PAD, 1212);
 
