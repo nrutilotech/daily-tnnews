@@ -68,9 +68,12 @@ If a run fails, GitHub emails you, and the next run 12 hours later tries again. 
 npm install
 ```
 ```bash
+npm test
+```
+```bash
 npm run sample
 ```
-`npm run sample` draws demo slides and a Story into `out/` (no keys needed). Open `out/preview.html` to see them. To build a real edition, copy `.env.example` to `.env`, add the keys, then run `npm run build`.
+`npm test` runs 12 offline checks with simulated Gemini, Pixabay and Instagram (no keys needed). They also run before every post, so a broken change can never publish. `npm run sample` draws demo slides and a Story into `out/` (no keys needed). Open `out/preview.html` to see them. To build a real edition, copy `.env.example` to `.env`, add the keys, then run `npm run build`.
 
 | To change | Edit |
 |---|---|

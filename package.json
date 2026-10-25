@@ -8,7 +8,8 @@
     "post": "node src/main.js post",
     "sample": "node src/main.js sample",
     "refresh-token": "node src/main.js refresh-token",
-    "site": "node src/main.js site"
+    "site": "node src/main.js site",
+    "test": "node test/run.mjs"
   },
   "keywords": [],
   "author": "",
