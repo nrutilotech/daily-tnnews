@@ -5,8 +5,8 @@
 //      searched inside a matching category, with people/fashion photos filtered out by their tags.
 //   3. Gemini looks at the candidate photos next to the article brief and picks one only if it really
 //      matches.
-//   4. If no stock photo fits (or the check can't run), the news report's own photo is used, credited
-//      to the publisher on the slide (SOURCE_PHOTOS=false turns this off). Crime stories never use the
+//   4. Only if SOURCE_PHOTOS=true (off by default: publishers' photos are copyrighted): when no stock
+//      photo fits, the news report's own photo is used, credited to the publisher. Crime stories never use the
 //      report's photo (it could show victims or minors); with nothing usable, the slide uses the
 //      designed background.
 import { z } from "zod";

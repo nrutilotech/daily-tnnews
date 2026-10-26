@@ -163,7 +163,7 @@ await test("the report's own photo is found (og:image), skipping logos", async (
   assert.equal(extractImage(`<p>no image</p>`, "https://news.example/a/1"), null);
 });
 
-await test("photo step: no stock photo fits → the report's photo, credited; never for crime stories", async () => {
+await test("photo step: news photos only when turned on; then credited, never for crime stories", async () => {
   const { createCanvas } = await import("@napi-rs/canvas");
   // a "photo" (varied colours) and a "logo card" (one flat colour)
   const png = (w, h, flat = false) => {
@@ -196,9 +196,16 @@ await test("photo step: no stock photo fits → the report's photo, credited; ne
     { ...base, category: "Business", source_name: "TOI", source_image: "https://news.example/shared.jpg" },
     { ...base, category: "Transport", source_name: "TOI", source_image: "https://news.example/shared.jpg" },
   ];
-  const photos = await quiet(() => findPhotos(stories));
-  assert.equal(photos[0]?.credit, "Photo: The Hindu");
-  assert.deepEqual(photos.slice(1), [null, null, null, null, null], "crime, tiny, logo card and a shared default image are all skipped");
+  const { config } = await import("../src/config.js");
+  assert.deepEqual(await quiet(() => findPhotos(stories)), stories.map(() => null), "news photos are off unless SOURCE_PHOTOS=true");
+  config.sourcePhotos = true;
+  try {
+    const photos = await quiet(() => findPhotos(stories));
+    assert.equal(photos[0]?.credit, "Photo: The Hindu");
+    assert.deepEqual(photos.slice(1), [null, null, null, null, null], "crime, tiny, logo card and a shared default image are all skipped");
+  } finally {
+    config.sourcePhotos = false;
+  }
 });
 
 // (after the other Gemini tests: a used-up model stays skipped for the rest of the process)
