@@ -1,7 +1,7 @@
-name: Post the latest edition on Threads
+name: Finish the latest edition (Story and Threads)
 
-# Use this if a "Post news" run reached Instagram but its Threads post failed: it posts the same
-# slides and summary on Threads. An edition that is already on Threads is never posted again.
+# Use this if a "Post news" run reached Instagram but its Story or its Threads post failed: it posts
+# whichever is missing for the latest edition. Nothing that is already posted is ever posted again.
 on:
   workflow_dispatch:
 
@@ -14,7 +14,7 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  threads:
+  finish:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
@@ -30,20 +30,25 @@ jobs:
 
       - run: npm ci
 
-      - name: Post on Threads
-        run: node src/main.js threads
+      - name: Post the missing Story / Threads post
+        run: node src/main.js finish
         env:
           MEDIA_BASE_URL: https://raw.githubusercontent.com/${{ github.repository }}/media
+          IG_USER_ID: ${{ secrets.IG_USER_ID }}
+          IG_ACCESS_TOKEN: ${{ secrets.IG_ACCESS_TOKEN }}
+          IG_GRAPH_HOST: ${{ vars.IG_GRAPH_HOST || 'graph.instagram.com' }}
+          POST_STORY: ${{ vars.POST_STORY || 'true' }}
           THREADS_ACCESS_TOKEN: ${{ secrets.THREADS_ACCESS_TOKEN }}
           THREADS_USER_ID: ${{ secrets.THREADS_USER_ID }}
 
-      - name: Remember it was posted
+      - name: Remember what was posted
+        if: always()
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add state/history.json
           git diff --cached --quiet && exit 0
-          git commit -qm "history: posted on Threads"
+          git commit -qm "history: finished the latest edition"
           for i in 1 2 3; do
             git pull -q --rebase origin main && git push -q && exit 0
             sleep 5

@@ -227,6 +227,7 @@ const igHandler = (scenario, log) => (url, opts) => {
   if (url.includes("media_publish")) {
     log.push("publish");
     if (scenario === "notready" && log.filter((l) => l === "publish").length === 1) return fail(400, { message: "Media ID is not available", code: 9007 });
+    if (scenario === "notfound" && log.filter((l) => l === "publish").length === 1) return fail(400, { message: "The requested resource does not exist", code: 24, error_user_msg: "The media with 1 cannot be found." });
     if (scenario === "timeout") {
       const e = new Error("t");
       e.name = "TimeoutError";
@@ -253,6 +254,13 @@ await test('Instagram: "media not ready" waits and publishes once', async () => 
   const log = [];
   handler = igHandler("notready", log);
   await quiet(() => publishCarousel(["a", "b"], "cap"));
+  assert.equal(log.filter((l) => l === "publish").length, 2);
+});
+
+await test('Instagram: Story "cannot be found" right after upload waits and publishes once', async () => {
+  const log = [];
+  handler = igHandler("notfound", log);
+  assert.equal(await quiet(() => publishStory("https://img/story.jpg")), "M1");
   assert.equal(log.filter((l) => l === "publish").length, 2);
 });
 
@@ -376,7 +384,7 @@ await test("Threads: if the images fail, the text is posted on its own", async (
 });
 
 await test("workflow files are in place", async () => {
-  for (const f of ["post-news.yml", "news-page.yml", "refresh-token.yml"]) assert.ok(fs.existsSync(new URL(`../.github/workflows/${f}`, import.meta.url)), f);
+  for (const f of ["post-news.yml", "news-page.yml", "refresh-token.yml", "finish-edition.yml"]) assert.ok(fs.existsSync(new URL(`../.github/workflows/${f}`, import.meta.url)), f);
   const post = fs.readFileSync(new URL("../.github/workflows/post-news.yml", import.meta.url), "utf8");
   assert.ok(!/\$\{\{\s*github\.token\s*\}\}@/.test(post), "token must not be inlined in a URL");
   // the bot must never comment or reply on posts

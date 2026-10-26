@@ -280,29 +280,59 @@ async function check() {
   if (!ok) throw new Error("a connection check failed");
 }
 
-// Puts the latest Instagram edition on Threads when the run's own Threads post failed
-// ("Post the latest edition on Threads" workflow). Never posts an edition to Threads twice.
-async function threads() {
+// Posts what the latest edition is missing — its Instagram Story and/or its Threads post — when the
+// run's own attempt failed ("Finish the latest edition" workflow). Never posts either one twice.
+async function finish() {
   const history = readHistory();
   const entry = history[history.length - 1];
   const e = readEditions().find((x) => x.id === entry?.id);
-  if (!entry || !e) return console.log("No posted edition to share on Threads.");
-  if (entry.threads) return console.log(`Edition ${e.id} is already on Threads: ${entry.threads}`);
+  if (!entry || !e) return console.log("No posted edition to finish.");
   if (!config.mediaBaseUrl) throw new Error("MEDIA_BASE_URL is not set");
-  const urls = e.files.map((f) => `${config.mediaBaseUrl}/${e.id}/${f}`);
   // the media branch only holds the latest posted slides
-  const r = await fetch(urls[0], { method: "HEAD", signal: AbortSignal.timeout(15000) }).catch(() => null);
-  if (!r?.ok) throw new Error(`The slides for ${e.id} are no longer hosted — wait for the next edition`);
-  console.log(`Posting edition ${e.id} on Threads…`);
-  const t = await postEditionToThreads({ id: e.id, dateLabel: e.dateLabel, editionLabel: e.editionLabel, edition: { edition_summary: e.summary, stories: e.stories } }, urls);
-  entry.threads = t.permalink ?? true;
-  fs.writeFileSync(config.stateFile, JSON.stringify(history, null, 2));
-  console.log(`Threads: posted ${t.permalink ?? ""}`);
+  const hosted = async (url) => !!(await fetch(url, { method: "HEAD", signal: AbortSignal.timeout(15000) }).catch(() => null))?.ok;
+  const save = () => fs.writeFileSync(config.stateFile, JSON.stringify(history, null, 2));
+  const hoursOld = (Date.now() - Date.parse(entry.postedAt)) / 3600000;
+  let failed = false;
+
+  if (entry.storyId) console.log("Story: already posted");
+  else if (!config.postStory) console.log("Story: turned off");
+  else if (hoursOld > 10) console.log(`Story: skipped — edition ${e.id} is ${hoursOld.toFixed(0)} hours old`);
+  else {
+    try {
+      const storyUrl = `${config.mediaBaseUrl}/${e.id}/story.jpg`;
+      if (!(await hosted(storyUrl))) throw new Error(`story image not reachable at ${storyUrl}`);
+      console.log(`Publishing the Story for ${e.id}…`);
+      entry.storyId = await publishStory(storyUrl);
+      save();
+      console.log("Story posted.");
+    } catch (err) {
+      failed = true;
+      console.log(`::warning::Story failed: ${err.message}`);
+    }
+  }
+
+  if (entry.threads) console.log(`Threads: already posted (${entry.threads})`);
+  else if (!config.threadsToken) console.log("Threads: not set up");
+  else {
+    try {
+      const urls = e.files.map((f) => `${config.mediaBaseUrl}/${e.id}/${f}`);
+      if (!(await hosted(urls[0]))) throw new Error(`the slides for ${e.id} are no longer hosted`);
+      console.log(`Posting edition ${e.id} on Threads…`);
+      const t = await postEditionToThreads({ id: e.id, dateLabel: e.dateLabel, editionLabel: e.editionLabel, edition: { edition_summary: e.summary, stories: e.stories } }, urls);
+      entry.threads = t.permalink ?? true;
+      save();
+      console.log(`Threads: posted ${t.permalink ?? ""}`);
+    } catch (err) {
+      failed = true;
+      console.log(`::warning::Threads failed: ${err.message.slice(0, 200)}`);
+    }
+  }
+  if (failed) throw new Error("something could not be posted — see the warnings above");
 }
 
-const run = { build, post, sample, site, check, threads, "refresh-token": refresh, "refresh-threads-token": refreshThreads }[cmd];
+const run = { build, post, sample, site, check, finish, "refresh-token": refresh, "refresh-threads-token": refreshThreads }[cmd];
 if (!run) {
-  console.log("Usage: node src/main.js build | post | sample | site | check | threads | refresh-token | refresh-threads-token");
+  console.log("Usage: node src/main.js build | post | sample | site | check | finish | refresh-token | refresh-threads-token");
   process.exit(1);
 }
 run()

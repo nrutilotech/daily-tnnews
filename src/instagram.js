@@ -54,6 +54,22 @@ async function waitReady(id, label) {
   throw new Error(`${label} not ready after 2 minutes`);
 }
 
+// Publishing straight after a container is ready sometimes answers "media not ready" (9007, retried
+// by api()) or "the requested resource does not exist / cannot be found". The latter also means
+// nothing was published yet, so wait and try again.
+async function publishMedia(creationId) {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      const { id } = await api("POST", `${config.igUserId}/media_publish`, { creation_id: creationId }, 5, true);
+      return id;
+    } catch (e) {
+      if (attempt >= 4 || !/does not exist|cannot be found/i.test(e.message)) throw e;
+      console.warn(`  Instagram isn't ready to publish yet — trying again in ${attempt * 15}s`);
+      await sleep(attempt * 15000);
+    }
+  }
+}
+
 export async function publishCarousel(imageUrls, caption) {
   if (!config.igUserId || !config.igToken) throw new Error("IG_USER_ID / IG_ACCESS_TOKEN are not set");
   if (imageUrls.length < 2 || imageUrls.length > 10) throw new Error("A carousel needs 2–10 images");
@@ -72,8 +88,7 @@ export async function publishCarousel(imageUrls, caption) {
     caption,
   });
   await waitReady(carousel, "carousel");
-  // publishing straight after FINISHED sometimes answers "media not ready"; api() retries that
-  const { id: mediaId } = await api("POST", `${config.igUserId}/media_publish`, { creation_id: carousel }, 5, true);
+  const mediaId = await publishMedia(carousel);
   const { permalink } = await api("GET", mediaId, { fields: "permalink" }, 2).catch(() => ({}));
   return { mediaId, permalink };
 }
@@ -82,8 +97,7 @@ export async function publishCarousel(imageUrls, caption) {
 export async function publishStory(imageUrl) {
   const { id } = await api("POST", `${config.igUserId}/media`, { image_url: imageUrl, media_type: "STORIES" });
   await waitReady(id, "story");
-  const { id: mediaId } = await api("POST", `${config.igUserId}/media_publish`, { creation_id: id }, 5, true);
-  return mediaId;
+  return publishMedia(id);
 }
 
 // The connected account (used by the "Check connections" workflow).
