@@ -208,6 +208,47 @@ await test("photo step: news photos only when turned on; then credited, never fo
   }
 });
 
+await test("photo step: no stock photo fits → a stock photo similar to the report's photo (which is never posted)", async () => {
+  const { createCanvas } = await import("@napi-rs/canvas");
+  const cv = createCanvas(1200, 675);
+  const ctx = cv.getContext("2d");
+  for (let x = 0; x < 1200; x += 40) for (let y = 0; y < 675; y += 40) (ctx.fillStyle = `rgb(${x % 256},${y % 256},${(x * y) % 256})`), ctx.fillRect(x, y, 40, 40);
+  const reportPhoto = cv.toBuffer("image/jpeg");
+  const kinds = [];
+  let describedImages = 0;
+  handler = (url, opts) => {
+    if (url.includes("generativelanguage")) {
+      const body = JSON.parse(opts.body);
+      const kind = Object.keys(body.generationConfig.responseJsonSchema.properties)[0];
+      kinds.push(kind);
+      if (kind === "briefs") return gem({ briefs: [1, 2].map((story) => ({ story, subject: "port", queries: ["port"], people_ok: false, summary: "s", key_fact: "" })) });
+      if (kind === "photos") {
+        describedImages = body.contents[0].parts.filter((p) => p.inline_data).length;
+        return gem({ photos: [1, 2].map((story) => ({ story, subject: "fishing boats in a harbour", queries: ["fishing boats harbour"], people_ok: true })) });
+      }
+      // first check: nothing fits; second check (similar photos): story 1 fits, story 2 doesn't
+      const second = kinds.filter((k) => k === "picks").length > 1;
+      return gem({ picks: [1, 2].map((story) => ({ story, photo: second && story === 1 ? 1 : 0, reason: "r" })) });
+    }
+    if (url.startsWith("https://pixabay.com/api/")) {
+      const boats = /fishing/.test(decodeURIComponent(url));
+      return ok({ hits: [{ id: Math.random(), type: "photo", tags: boats ? "boats, harbour" : "port", webformatURL: "https://img/p", largeImageURL: boats ? "https://img/boatsL" : "https://img/portL", user: boats ? "boatman" : "x", imageWidth: 1, imageHeight: 1 }] });
+    }
+    if (url === "https://news.example/report.jpg") return new Response(reportPhoto, { status: 200 });
+    return new Response(new Uint8Array([1]), { status: 200 });
+  };
+  const base = SAMPLE_EDITION.stories[0];
+  const stories = [
+    { ...base, category: "Weather", source_image: "https://news.example/report.jpg" },
+    { ...base, category: "Law & Order", source_image: "https://news.example/report2.jpg" },
+  ];
+  const photos = await quiet(() => findPhotos(stories));
+  assert.deepEqual(kinds, ["briefs", "picks", "photos", "picks"]);
+  assert.equal(describedImages, 1, "only the report photo that loaded is described");
+  assert.equal(photos[0]?.credit, "Photo: boatman / Pixabay");
+  assert.equal(photos[1], null);
+});
+
 // (after the other Gemini tests: a used-up model stays skipped for the rest of the process)
 await test("a model out of its daily quota is skipped at once, and for the rest of the run", async () => {
   const calls = [];
@@ -386,6 +427,11 @@ await test("Threads: if the images fail, the text is posted on its own", async (
 await test("workflow files are in place", async () => {
   for (const f of ["post-news.yml", "news-page.yml", "refresh-token.yml", "finish-edition.yml"]) assert.ok(fs.existsSync(new URL(`../.github/workflows/${f}`, import.meta.url)), f);
   const post = fs.readFileSync(new URL("../.github/workflows/post-news.yml", import.meta.url), "utf8");
+  // backup schedule times must stop before building (or they'd use up the Gemini quota)
+  for (const step of ["Self-check", "Build slides", "Host slides", "Post to Instagram", "Remember what was posted"]) {
+    const block = post.slice(post.indexOf(`- name: ${step}`)).split(/\n\s*- (?:name|uses|run):/)[0];
+    assert.ok(block.includes("steps.due.outputs.due == 'true'"), `"${step}" must only run when an edition is due`);
+  }
   assert.ok(!/\$\{\{\s*github\.token\s*\}\}@/.test(post), "token must not be inlined in a URL");
   // the bot must never comment or reply on posts
   for (const f of fs.readdirSync(new URL("../src/", import.meta.url))) {

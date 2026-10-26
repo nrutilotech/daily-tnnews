@@ -330,9 +330,20 @@ async function finish() {
   if (failed) throw new Error("something could not be posted — see the warnings above");
 }
 
-const run = { build, post, sample, site, check, finish, "refresh-token": refresh, "refresh-threads-token": refreshThreads }[cmd];
+// First step of every "Post news" run: is an edition due? A scheduled run within 6 hours of the last
+// post (a backup time, or a late start) stops here, before using any Gemini quota. Manual runs are
+// always due. Prints due=true/false for the workflow.
+async function due() {
+  const last = readHistory().at(-1);
+  const hours = last ? (Date.now() - Date.parse(last.postedAt)) / 3600000 : Infinity;
+  const isDue = process.env.GITHUB_EVENT_NAME !== "schedule" || hours >= 6;
+  console.log(isDue ? "An edition is due." : `An edition was posted ${hours.toFixed(1)} hours ago — nothing to do this time.`);
+  if (process.env.GITHUB_OUTPUT) fs.appendFileSync(process.env.GITHUB_OUTPUT, `due=${isDue}\n`);
+}
+
+const run = { build, post, sample, site, check, finish, due, "refresh-token": refresh, "refresh-threads-token": refreshThreads }[cmd];
 if (!run) {
-  console.log("Usage: node src/main.js build | post | sample | site | check | finish | refresh-token | refresh-threads-token");
+  console.log("Usage: node src/main.js build | post | sample | site | check | finish | due | refresh-token | refresh-threads-token");
   process.exit(1);
 }
 run()
